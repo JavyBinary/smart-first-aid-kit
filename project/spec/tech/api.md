@@ -1,222 +1,183 @@
-# Спецификация контрактов API (REST API Contracts)
+# Спецификация контрактов REST API
 
-Спецификация разработана для синхронизации работы бэкенда (Полина) и фронтенда (Катя). Описывает форматы запросов и ответов REST API.
-
----
-
-## 1. Общие соглашения
-
-- **Базовый URL:** `/api/v1`
-- **Формат обмена данными:** `Content-Type: application/json; charset=utf-8`
-- **Аутентификация:** Bearer Token (JWT в заголовке `Authorization: Bearer <token>`)
-- **Стандартные коды ответов:**
-  - `200 OK` — успешный запрос.
-  - `201 Created` — ресурс успешно создан.
-  - `400 Bad Request` — ошибка валидации входных данных.
-  - `401 Unauthorized` — отсутствует или невалиден токен сессии.
-  - `403 Forbidden` — недостаточно прав (доступно только Администратору).
-  - `404 Not Found` — запрашиваемый ресурс не найден.
-  - `500 Internal Server Error` — внутренняя ошибка сервера.
+Контракты разработаны для синхронизации работы бэкенда (Полина) и фронтенда (Катя). Все запросы и ответы типизированы в формате JSON.
 
 ---
 
-## 2. Модуль аутентификации (`/auth`)
+## 1. Базовые параметры
 
-### 2.1. Регистрация нового пользователя
-- **Метод:** `POST /api/v1/auth/register`
-- **Тело запроса (Request Body):**
+- **Префикс эндпоинтов:** `/api/v1`
+- **Заголовки:** `Content-Type: application/json`
+- **Авторизация:** `Authorization: Bearer <jwt-token>`
+
+---
+
+## 2. Эндпоинты авторизации (`/auth`)
+
+### 2.1. Регистрация
+`POST /api/v1/auth/register`
+
+- **Request:**
 ```json
 {
   "email": "user@example.com",
-  "password": "securePassword123",
-  "name": "Алексей Иванов"
+  "password": "strongPassword123",
+  "name": "Алексей"
 }
 ```
-- **Успешный ответ (Response `201 Created`):**
+- **Response (`201 Created`):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGciOiJIUzI1NiIsIn...",
   "user": {
-    "id": "usr_9981",
+    "id": "usr_101",
     "email": "user@example.com",
-    "name": "Алексей Иванов",
+    "name": "Алексей",
     "role": "user"
   }
 }
 ```
 
-### 2.2. Вход в систему (Авторизация)
-- **Метод:** `POST /api/v1/auth/login`
-- **Тело запроса:**
+### 2.2. Авторизация
+`POST /api/v1/auth/login`
+
+- **Request:**
 ```json
 {
-  "email": "admin@medai.ru",
-  "password": "adminPassword123"
+  "email": "user@example.com",
+  "password": "strongPassword123"
 }
 ```
-- **Успешный ответ (Response `200 OK`):**
+- **Response (`200 OK`):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGciOiJIUzI1NiIsIn...",
   "user": {
-    "id": "adm_0001",
-    "email": "admin@medai.ru",
-    "name": "Тимур (Куратор базы)",
-    "role": "admin"
+    "id": "usr_101",
+    "email": "user@example.com",
+    "name": "Алексей",
+    "role": "user"
   }
 }
 ```
 
 ---
 
-## 3. Модуль управления домашней аптечкой (`/kit`)
+## 3. Эндпоинты управления аптечкой (`/kit`)
 
 ### 3.1. Получение списка лекарств в аптечке
-- **Метод:** `GET /api/v1/kit`
-- **Параметры строки запроса:** `category` (опционально, фильтр по тегу), `search` (опционально)
-- **Успешный ответ (Response `200 OK`):**
+`GET /api/v1/kit?category=Обезболивающее`
+
+- **Response (`200 OK`):**
 ```json
 {
-  "total_items": 3,
   "items": [
     {
-      "id": "med_101",
+      "id": "kit_01",
       "name": "Ибупрофен",
       "dosage": "200 мг",
       "form": "таблетки",
       "category": "Обезболивающее",
       "expiry_date": "2027-05-01",
-      "is_expired": false,
-      "created_at": "2026-10-01T12:00:00Z"
-    },
-    {
-      "id": "med_102",
-      "name": "Дротаверин",
-      "dosage": "40 мг",
-      "form": "таблетки",
-      "category": "ЖКТ",
-      "expiry_date": "2026-12-01",
-      "is_expired": false,
-      "created_at": "2026-10-01T12:05:00Z"
+      "is_expired": false
     }
-  ]
+  ],
+  "total": 1
 }
 ```
 
 ### 3.2. Добавление лекарства в аптечку
-- **Метод:** `POST /api/v1/kit/items`
-- **Тело запроса:**
+`POST /api/v1/kit/items`
+
+- **Request:**
 ```json
 {
-  "name": "Парацетамол",
+  "name": "Амоксициллин",
   "dosage": "500 мг",
-  "form": "таблетки",
-  "category": "От простуды",
-  "expiry_date": "2028-01-15"
+  "form": "капсулы",
+  "category": "Антибиотики",
+  "expiry_date": "2028-02-15"
 }
 ```
-- **Успешный ответ (Response `201 Created`):**
+- **Response (`201 Created`):**
 ```json
 {
-  "id": "med_103",
-  "name": "Парацетамол",
-  "category": "От простуды",
-  "status": "added"
+  "id": "kit_02",
+  "status": "created"
 }
 ```
 
-### 3.3. Удаление лекарства из аптечки
-- **Метод:** `DELETE /api/v1/kit/items/{item_id}`
-- **Успешный ответ (Response `200 OK`):**
-```json
-{
-  "status": "deleted",
-  "id": "med_101"
-}
-```
+### 3.3. Удаление лекарства
+`DELETE /api/v1/kit/items/{id}`
+- **Response (`200 OK`):** `{"status": "deleted"}`
 
 ---
 
-## 4. Модуль интеллектуального диалога и RAG (`/chat`)
+## 4. Эндпоинт интеллектуального RAG-диалога (`/chat`)
 
 ### 4.1. Отправка симптоматического запроса
-- **Метод:** `POST /api/v1/chat/query`
-- **Тело запроса:**
+`POST /api/v1/chat/query`
+
+- **Request:**
 ```json
 {
   "query": "Сильно болит голова и давит на виски, что принять?",
   "include_kit_context": true
 }
 ```
-- **Успешный ответ (Response `200 OK`):**
+
+- **Response (`200 OK`):**
 ```json
 {
-  "query_id": "req_88123",
   "status": "success",
   "emergency_mode": false,
   "recommendation": {
-    "recommended_medicine": "Ибупрофен",
+    "medicine_name": "Ибупрофен",
     "in_user_kit": true,
-    "dosage_regimen": "1 таблетка (200 мг) после еды. Максимум 3 раза в сутки.",
-    "pharmacological_action": "НПВП, оказывает выраженное анальгезирующее и противовоспалительное действие.",
-    "contraindications": ["Язва желудка в стадии обострения", "Тяжелая почечная недостаточность", "III триместр беременности"],
-    "alternative_medicines": ["Парацетамол (нет в аптечке)"]
+    "dosage": "1 таблетка (200 мг) после еды. Повторный прием не ранее чем через 4-6 часов.",
+    "contraindications": "Язвенная болезнь ЖКТ, тяжелая почечная недостаточность",
+    "warnings": "Не превышать 1200 мг в сутки"
   },
-  "retrieved_sources": [
+  "sources": [
     {
-      "doc_id": "doc_ibuprofen_200",
-      "title": "Инструкция по медицинскому применению: Ибупрофен 200мг",
-      "bm25_score": 14.82,
-      "source_url": "https://grls.rosminzdrav.ru/Grls_View_v2.aspx?routingGuid=..."
+      "doc_id": "doc_001",
+      "title": "Инструкция ЛП-001234: Ибупрофен 200мг",
+      "bm25_score": 14.82
     }
   ],
-  "disclaimer": "Внимание! Рекомендация носит вспомогательный характер. Если симптомы не проходят в течение 48 часов, обязательно обратитесь к врачу."
+  "disclaimer": "Информация носит ознакомительный характер. При усилении симптомов обратитесь к врачу."
 }
 ```
 
 ---
 
-## 5. Модуль администрирования корпуса (`/admin`)
+## 5. Эндпоинты администратора (`/admin`)
 
-*(Доступно только для пользователей с ролью `role: "admin"`)*
+*(Требуют `role: "admin"`)*
 
-### 5.1. Загрузка медицинской инструкции в корпус
-- **Метод:** `POST /api/v1/admin/corpus/upload`
-- **Тело запроса:**
+### 5.1. Загрузка медицинской аннотации в корпус
+`POST /api/v1/admin/corpus/upload`
+- **Request:**
 ```json
 {
-  "title": "Амоксициллин 500 мг (капсулы)",
+  "title": "Амоксициллин 500 мг",
   "mnn": "Амоксициллин",
   "category": "Антибиотики",
-  "content": "Показания: инфекции дыхательных путей... Дозировка: 500 мг 3 раза в день... Противопоказания: гиперчувствительность к пенициллинам..."
+  "content": "Показания: инфекции дыхательных путей... Дозировка: 500 мг 3 раза в сутки..."
 }
 ```
 
-### 5.2. Запуск переиндексации BM25
-- **Метод:** `POST /api/v1/admin/index/rebuild`
-- **Успешный ответ (Response `200 OK`):**
+### 5.2. Запуск бенчмаркинга
+`GET /api/v1/admin/benchmark/metrics`
+- **Response (`200 OK`):**
 ```json
 {
-  "status": "indexed",
-  "total_documents": 143,
-  "vocabulary_size": 4832,
-  "average_document_length": 182.4,
-  "indexing_time_ms": 38.6
-}
-```
-
-### 5.3. Запуск расчета метрик качества (Бенчмарк)
-- **Метод:** `GET /api/v1/admin/benchmark/metrics`
-- **Успешный ответ (Response `200 OK`):**
-```json
-{
-  "total_test_queries": 45,
+  "queries_count": 45,
   "metrics": {
     "mrr": 0.842,
     "recall_at_1": 0.778,
     "recall_at_3": 0.911,
     "recall_at_5": 0.956
-  },
-  "evaluated_at": "2026-10-05T09:00:00Z"
+  }
 }
 ```
