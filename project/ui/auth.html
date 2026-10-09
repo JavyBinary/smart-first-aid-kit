@@ -468,9 +468,11 @@
 
     setTimeout(() => {
       console.log('Вход:', { email, password });
+      const isAdmin = email.trim().toLowerCase() === 'admin@medai.ru';
       localStorage.setItem('medai_user', email);
+      localStorage.setItem('medai_role', isAdmin ? 'admin' : 'user');
       setLoading(btn, false);
-      window.location.href = 'site.html';
+      window.location.href = isAdmin ? 'admin.html' : 'site.html';
     }, 900);
   });
 
@@ -505,6 +507,7 @@
     setTimeout(() => {
       console.log('Регистрация:', { name, email, password });
       localStorage.setItem('medai_user', email);
+      localStorage.setItem('medai_role', 'user');
       setLoading(btn, false);
       window.location.href = 'site.html';
     }, 900);

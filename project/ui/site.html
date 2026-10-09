@@ -215,15 +215,7 @@
     margin: 8px 8px;
   }
 
-  /* Режим редактирования */
-  .profile-edit {
-    padding: 20px 18px 18px;
-    display: none;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  .profile-panel.editing .profile-body { display: none; }
-  .profile-panel.editing .profile-edit { display: block; }
+  /* Режим редактирования — вынесен в отдельные модалки (см. .modal-edit) */
 
   /* ===== Загрузка фото ===== */
   .avatar-upload {
@@ -309,67 +301,44 @@
   .avatar-remove.show { display: inline-block; }
   .avatar-remove:hover { background: #fdecec; }
 
-  /* Поля */
-  .profile-edit label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-    margin-top: 12px;
-  }
-  .profile-edit label:first-of-type { margin-top: 4px; }
-
-  .profile-edit input {
-    width: 100%;
-    border: 1.5px solid var(--border);
-    border-radius: 11px;
-    padding: 10px 13px;
-    font-family: inherit;
-    font-size: 13.5px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .profile-edit input:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(1,159,116,0.12);
-  }
-  .profile-edit input.invalid {
-    border-color: var(--danger);
-    box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
-  }
-
-  .profile-edit-error {
-    display: none;
-    font-size: 12px;
-    color: var(--danger);
-    margin-top: 6px;
-    font-weight: 500;
-  }
-  .profile-edit-error.show { display: block; }
-
-  .edit-actions {
+  /* ===== Модалка редактирования данных ===== */
+  .modal-edit {
+    max-width: 820px;
+    height: 50vh;
+    min-height: 360px;
     display: flex;
-    gap: 8px;
-    margin-top: 20px;
+    flex-direction: column;
+    overflow: hidden;
   }
-  .edit-actions button {
+  .modal-edit h3 { flex-shrink: 0; }
+  .modal-edit .edit-body {
     flex: 1;
-    padding: 11px;
-    border-radius: 11px;
-    border: none;
-    font-family: inherit;
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
+    overflow-y: auto;
+    padding-right: 4px;
   }
-  .edit-actions .btn-cancel { background: #f1f3f4; color: var(--text); }
-  .edit-actions .btn-cancel:hover { background: #e7e9eb; }
-  .edit-actions .btn-save { background: var(--green); color: #fff; }
-  .edit-actions .btn-save:hover { background: var(--green-dark); }
-  .edit-actions button:active { transform: scale(0.98); }
+  .modal-edit .edit-body::-webkit-scrollbar { width: 6px; }
+  .modal-edit .edit-body::-webkit-scrollbar-thumb { background: #d0d3d7; border-radius: 3px; }
+
+  .edit-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .edit-grid .avatar-upload { margin-bottom: 14px; flex-shrink: 0; }
+  .edit-grid .edit-fields { width: 100%; max-width: 440px; }
+
+  .modal-edit .modal-actions { flex-shrink: 0; }
+
+  /* ===== Смена пароля ===== */
+  .password-success {
+    display: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    margin-top: 14px;
+  }
+  .password-success.show { display: block; }
 
   /* ===== Боковая панель аптечки ===== */
   .sidebar {
@@ -593,6 +562,31 @@
     border-color: var(--danger);
     box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
   }
+
+  /* Глазик показа пароля */
+  .password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .password-wrap input { padding-right: 44px; }
+
+  .toggle-pass {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px; height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #b8bdc2;
+    transition: background 0.2s, color 0.2s;
+  }
+  .toggle-pass:hover { background: #f1f3f4; color: var(--text); }
+  .toggle-pass svg { width: 18px; height: 18px; }
   .modal-error {
     display: none;
     font-size: 12.5px;
@@ -817,6 +811,9 @@
     .messages { padding: 20px 14px 8px; }
     .input-area { padding: 0 14px 14px; }
     .msg-row { max-width: 92%; }
+    .modal-edit { height: auto; max-height: 85vh; }
+    .edit-grid { flex-direction: column; align-items: center; gap: 18px; }
+    .edit-grid .edit-fields { width: 100%; }
   }
 </style>
 </head>
@@ -862,6 +859,14 @@
         Редактировать данные
       </button>
 
+      <button class="profile-item" id="changePassBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+        </svg>
+        Сменить пароль
+      </button>
+
       <div class="profile-divider"></div>
 
       <button class="profile-item" id="logoutBtn">
@@ -883,39 +888,6 @@
       </button>
     </div>
 
-    <!-- Режим редактирования -->
-    <div class="profile-edit">
-      <!-- Аватар -->
-      <div class="avatar-upload">
-        <div class="avatar-wrap">
-          <div class="avatar-preview" id="avatarPreview">
-            <span id="avatarPreviewText">—</span>
-          </div>
-          <div class="avatar-camera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-          </div>
-        </div>
-        <input type="file" id="avatarInput" accept="image/*" style="display:none">
-        <div class="avatar-hint">Нажмите на аватар, чтобы загрузить фото</div>
-        <button type="button" class="avatar-remove" id="avatarRemove">Удалить фото</button>
-      </div>
-
-      <label for="editName">Имя</label>
-      <input type="text" id="editName" placeholder="Ваше имя">
-      <div class="profile-edit-error" id="editNameError">Введите имя</div>
-
-      <label for="editEmail">Email</label>
-      <input type="email" id="editEmail" placeholder="you@example.com">
-      <div class="profile-edit-error" id="editEmailError">Введите корректный email</div>
-
-      <div class="edit-actions">
-        <button class="btn-cancel" id="editCancel">Отмена</button>
-        <button class="btn-save" id="editSave">Сохранить</button>
-      </div>
-    </div>
   </div>
 
   <div class="overlay" id="overlay"></div>
@@ -1011,6 +983,100 @@
   </div>
 </div>
 
+<!-- Модалка редактирования данных -->
+<div class="modal-backdrop" id="editBackdrop">
+  <div class="modal modal-edit">
+    <h3>Редактировать данные</h3>
+
+    <div class="edit-body">
+      <div class="edit-grid">
+        <!-- Аватар -->
+        <div class="avatar-upload">
+          <div class="avatar-wrap">
+            <div class="avatar-preview" id="avatarPreview">
+              <span id="avatarPreviewText">—</span>
+            </div>
+            <div class="avatar-camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
+          </div>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none">
+          <div class="avatar-hint">Нажмите на аватар, чтобы загрузить фото</div>
+          <button type="button" class="avatar-remove" id="avatarRemove">Удалить фото</button>
+        </div>
+
+        <div class="edit-fields">
+          <label for="editName">Имя</label>
+          <input type="text" id="editName" placeholder="Ваше имя">
+          <div class="modal-error" id="editNameError">Введите имя</div>
+
+          <label for="editEmail">Email</label>
+          <input type="email" id="editEmail" placeholder="you@example.com">
+          <div class="modal-error" id="editEmailError">Введите корректный email</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancel">Отмена</button>
+      <button class="btn-save" id="editSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка смены пароля -->
+<div class="modal-backdrop" id="passwordBackdrop">
+  <div class="modal">
+    <h3>Смена пароля</h3>
+
+    <label for="oldPassword">Текущий пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="oldPassword" placeholder="••••••••" autocomplete="current-password">
+      <button type="button" class="toggle-pass" data-target="oldPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="oldPasswordError">Пароль должен быть не короче 6 символов</div>
+
+    <label for="newPassword">Новый пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="newPassword" placeholder="Минимум 6 символов" autocomplete="new-password">
+      <button type="button" class="toggle-pass" data-target="newPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="newPasswordError">Пароль должен быть не короче 6 символов</div>
+
+    <label for="confirmPassword">Повторите новый пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="confirmPassword" placeholder="••••••••" autocomplete="new-password">
+      <button type="button" class="toggle-pass" data-target="confirmPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="confirmPasswordError">Пароли не совпадают</div>
+
+    <div class="password-success" id="passwordSuccess">Пароль обновлён</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="passwordCancel">Отмена</button>
+      <button class="btn-save" id="passwordSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // ===== Пользователь =====
   let user = {
@@ -1067,7 +1133,6 @@
   function closeProfile() {
     profilePanel.classList.remove('open');
     profileBtn.classList.remove('active');
-    profilePanel.classList.remove('editing');
   }
   function toggleProfile() {
     profilePanel.classList.contains('open') ? closeProfile() : openProfile();
@@ -1085,7 +1150,8 @@
     closeProfile();
   });
 
-  // ===== Редактирование =====
+  // ===== Редактирование данных (модалка поверх чата) =====
+  const editBackdrop = document.getElementById('editBackdrop');
   const editProfileBtn = document.getElementById('editProfileBtn');
   const editName = document.getElementById('editName');
   const editEmail = document.getElementById('editEmail');
@@ -1118,7 +1184,7 @@
     }
   }
 
-  function enterEditMode() {
+  function openEditModal() {
     editName.value = user.name;
     editEmail.value = user.email;
     pendingAvatar = user.avatar;
@@ -1127,16 +1193,20 @@
     editNameError.classList.remove('show');
     editEmailError.classList.remove('show');
     renderAvatarPreview();
-    profilePanel.classList.add('editing');
+    closeProfile();
+    editBackdrop.classList.add('open');
     setTimeout(() => editName.focus(), 100);
   }
-  function exitEditMode() {
-    profilePanel.classList.remove('editing');
+  function closeEditModal() {
+    editBackdrop.classList.remove('open');
     pendingAvatar = user.avatar;
   }
 
-  editProfileBtn.addEventListener('click', enterEditMode);
-  editCancel.addEventListener('click', exitEditMode);
+  editProfileBtn.addEventListener('click', openEditModal);
+  editCancel.addEventListener('click', closeEditModal);
+  editBackdrop.addEventListener('click', (e) => {
+    if (e.target === editBackdrop) closeEditModal();
+  });
 
   editName.addEventListener('input', () => {
     editName.classList.remove('invalid');
@@ -1177,7 +1247,112 @@
     renderAvatarPreview();
   });
 
-  // ===== Сохранение =====
+  // ===== Смена пароля (отдельная модалка) =====
+  const passwordBackdrop = document.getElementById('passwordBackdrop');
+  const changePassBtn = document.getElementById('changePassBtn');
+  const oldPassword = document.getElementById('oldPassword');
+  const newPassword = document.getElementById('newPassword');
+  const confirmPassword = document.getElementById('confirmPassword');
+  const oldPasswordError = document.getElementById('oldPasswordError');
+  const newPasswordError = document.getElementById('newPasswordError');
+  const confirmPasswordError = document.getElementById('confirmPasswordError');
+  const passwordSuccess = document.getElementById('passwordSuccess');
+  const passwordCancel = document.getElementById('passwordCancel');
+  const passwordSave = document.getElementById('passwordSave');
+
+  const passwordFields = [
+    { input: oldPassword, error: oldPasswordError },
+    { input: newPassword, error: newPasswordError },
+    { input: confirmPassword, error: confirmPasswordError }
+  ];
+
+  const eyeOpenIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>`;
+  const eyeOffIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <path d="M1 1l22 22"/>
+    </svg>`;
+
+  function resetPasswordForm() {
+    passwordSuccess.classList.remove('show');
+    passwordFields.forEach(({ input, error }) => {
+      input.value = '';
+      input.type = 'password';
+      input.classList.remove('invalid');
+      error.classList.remove('show');
+    });
+    passwordBackdrop.querySelectorAll('.toggle-pass').forEach(btn => {
+      btn.innerHTML = eyeOpenIcon;
+    });
+  }
+
+  function openPasswordModal() {
+    resetPasswordForm();
+    closeProfile();
+    passwordBackdrop.classList.add('open');
+    setTimeout(() => oldPassword.focus(), 100);
+  }
+  function closePasswordModal() {
+    passwordBackdrop.classList.remove('open');
+    resetPasswordForm();
+  }
+
+  changePassBtn.addEventListener('click', openPasswordModal);
+  passwordCancel.addEventListener('click', closePasswordModal);
+  passwordBackdrop.addEventListener('click', (e) => {
+    if (e.target === passwordBackdrop) {
+      closePasswordModal();
+      return;
+    }
+    const btn = e.target.closest('.toggle-pass');
+    if (!btn) return;
+    const field = document.getElementById(btn.dataset.target);
+    const isPassword = field.type === 'password';
+    field.type = isPassword ? 'text' : 'password';
+    btn.innerHTML = isPassword ? eyeOffIcon : eyeOpenIcon;
+    btn.setAttribute('aria-label', isPassword ? 'Скрыть пароль' : 'Показать пароль');
+    field.focus();
+  });
+
+  passwordFields.forEach(({ input, error }) => {
+    input.addEventListener('input', () => {
+      input.classList.remove('invalid');
+      error.classList.remove('show');
+    });
+  });
+
+  function validatePasswordForm() {
+    let ok = true;
+
+    if (oldPassword.value.length < 6) {
+      oldPassword.classList.add('invalid');
+      oldPasswordError.classList.add('show');
+      ok = false;
+    }
+    if (newPassword.value.length < 6) {
+      newPassword.classList.add('invalid');
+      newPasswordError.classList.add('show');
+      ok = false;
+    }
+    if (confirmPassword.value.length < 6 || newPassword.value !== confirmPassword.value) {
+      confirmPassword.classList.add('invalid');
+      confirmPasswordError.classList.add('show');
+      ok = false;
+    }
+
+    if (!ok) {
+      const firstInvalid = passwordBackdrop.querySelector('input.invalid');
+      if (firstInvalid) firstInvalid.focus();
+    }
+    return ok;
+  }
+
+  // ===== Сохранение данных =====
   editSave.addEventListener('click', () => {
     const name = editName.value.trim();
     const email = editEmail.value.trim();
@@ -1205,12 +1380,32 @@
     else localStorage.removeItem('medai_avatar');
 
     renderProfile();
-    exitEditMode();
+    closeEditModal();
+  });
+
+  // ===== Сохранение пароля =====
+  passwordSave.addEventListener('click', () => {
+    if (!validatePasswordForm()) return;
+
+    // === ЗДЕСЬ БУДЕТ ЗАПРОС К ВАШЕМУ БЭКЕНДУ ===
+    // fetch('/api/v1/auth/password', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ old_password: oldPassword.value, new_password: newPassword.value })
+    // });
+
+    passwordSave.disabled = true;
+    setTimeout(() => {
+      passwordSave.disabled = false;
+      passwordSuccess.classList.add('show');
+      setTimeout(closePasswordModal, 1200);
+    }, 600);
   });
 
   // ===== Выход =====
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_role');
     localStorage.removeItem('medai_name');
     localStorage.removeItem('medai_avatar');
     window.location.href = 'auth.html';
@@ -1230,6 +1425,7 @@
   });
   document.getElementById('deleteAccountConfirm').addEventListener('click', () => {
     localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_role');
     localStorage.removeItem('medai_name');
     localStorage.removeItem('medai_avatar');
     window.location.href = 'auth.html';
@@ -1313,7 +1509,7 @@
     const filtered = medications.filter(m => {
       const matchesQuery = !q || m.name.toLowerCase().includes(q);
       const matchesTags = activeTags.size === 0
-        || (m.tags || []).some(t => activeTags.has(t));
+        || [...activeTags].every(t => (m.tags || []).includes(t));
       return matchesQuery && matchesTags;
     });
 
@@ -1323,7 +1519,7 @@
       let msg;
       if (q && activeTags.size) msg = `Ничего не найдено по запросу «${searchInput.value}» с выбранными тегами`;
       else if (q) msg = `Ничего не найдено по запросу «${searchInput.value}»`;
-      else if (activeTags.size) msg = `Нет лекарств с выбранными тегами`;
+      else if (activeTags.size) msg = `Нет лекарств со всеми выбранными тегами`;
       else msg = 'В аптечке пока пусто';
 
       medList.innerHTML = `
@@ -1513,6 +1709,8 @@
       if (deleteAccountBackdrop.classList.contains('open')) deleteAccountBackdrop.classList.remove('open');
       else if (confirmBackdrop.classList.contains('open')) closeConfirm();
       else if (modalBackdrop.classList.contains('open')) closeModal();
+      else if (passwordBackdrop.classList.contains('open')) closePasswordModal();
+      else if (editBackdrop.classList.contains('open')) closeEditModal();
       else if (sidebar.classList.contains('open')) closeSidebar();
       else if (profilePanel.classList.contains('open')) closeProfile();
     }

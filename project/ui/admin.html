@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedAI — Админ-панель</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green: #019F74;
+    --green-dark: #017a5a;
+    --green-light: #e6f7f2;
+    --bg-pattern: #f7f9fa;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #7a7f85;
+    --border: #e5e7eb;
+    --danger: #e5484d;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--bg-pattern);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' opacity='0.9'><g transform='translate(60 60) rotate(-30)'><rect x='-28' y='-11' width='56' height='22' rx='11' stroke='%23ccd2d0' stroke-width='1.6'/><line x1='0' y1='-11' x2='0' y2='11' stroke='%23ccd2d0' stroke-width='1.6'/></g><g transform='translate(180 60) rotate(30)'><rect x='-28' y='-11' width='56' height='22' rx='11' stroke='%23ccd2d0' stroke-width='1.6'/><line x1='0' y1='-11' x2='0' y2='11' stroke='%23ccd2d0' stroke-width='1.6'/></g><g transform='translate(60 180) rotate(-30)'><rect x='-28' y='-11' width='56' height='22' rx='11' stroke='%23ccd2d0' stroke-width='1.6'/><line x1='0' y1='-11' x2='0' y2='11' stroke='%23ccd2d0' stroke-width='1.6'/></g><g transform='translate(180 180) rotate(30)'><rect x='-28' y='-11' width='56' height='22' rx='11' stroke='%23ccd2d0' stroke-width='1.6'/><line x1='0' y1='-11' x2='0' y2='11' stroke='%23ccd2d0' stroke-width='1.6'/></g><g transform='translate(120 120) rotate(-55)'><rect x='-24' y='-10' width='48' height='20' rx='10' stroke='%23ccd2d0' stroke-width='1.6'/><line x1='0' y1='-10' x2='0' y2='10' stroke='%23ccd2d0' stroke-width='1.6'/></g></g></svg>");
+    background-size: 240px 240px;
+    background-repeat: repeat;
+  }
+
+  .app { display: flex; height: 100vh; position: relative; }
+
+  /* ===== Левый белый край ===== */
+  .side-rail {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 64px; background: #ffffff;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 14px 0;
+    z-index: 50;
+  }
+
+  .rail-logo {
+    width: 44px; height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--green), #02c494);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(1,159,116,0.35);
+    margin-bottom: 16px;
+  }
+  .rail-logo svg { width: 24px; height: 24px; }
+
+  .rail-spacer { flex: 1; }
+
+  .rail-btn {
+    position: relative;
+    width: 46px; height: 46px;
+    background: transparent; border: none; border-radius: 12px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #111;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+    margin-bottom: 16px;
+  }
+  .rail-btn:hover { background: var(--green-light); color: var(--green); transform: scale(1.05); }
+  .rail-btn svg { width: 26px; height: 26px; }
+
+  .rail-tooltip {
+    position: absolute;
+    left: calc(100% + 14px); top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    background: #1a1a1a; color: #fff;
+    font-size: 13px; font-weight: 500;
+    padding: 8px 14px; border-radius: 10px;
+    white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    z-index: 60;
+  }
+  .rail-tooltip::before {
+    content: "";
+    position: absolute;
+    left: -5px; top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 10px; height: 10px; background: #1a1a1a;
+  }
+  .rail-btn:hover .rail-tooltip { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+  /* ===== Рабочая зона ===== */
+  .main-wrap {
+    flex: 1;
+    margin-left: 64px;
+    display: flex; justify-content: center;
+    padding: 24px 24px 24px 28px;
+    height: 100vh; overflow: hidden;
+  }
+
+  .panel {
+    width: 100%; max-width: 900px; height: 100%;
+    background: var(--card);
+    border-radius: 22px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.03);
+    animation: cardIn 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .panel-header {
+    padding: 24px 26px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .panel-header h1 {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .panel-header p {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* ===== Плашка статуса ===== */
+  .stat-bar {
+    margin: 0 26px 16px;
+    background: linear-gradient(135deg, var(--green-light), #f4fbf8);
+    border: 1.5px solid rgba(1,159,116,0.22);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat-sep { color: #b8bdc2; font-weight: 400; }
+  .stat-item { display: inline-flex; align-items: center; gap: 7px; }
+  .stat-item b { color: var(--green); font-weight: 700; }
+  .stat-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(1,159,116,0.18);
+  }
+
+  /* ===== Таблица ===== */
+  .table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 26px 20px;
+  }
+  .table-wrap::-webkit-scrollbar { width: 6px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #d0d3d7; border-radius: 3px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--bg-pattern);
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    z-index: 2;
+  }
+  tbody td {
+    font-size: 13.5px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background 0.15s; }
+  tbody tr:hover td { background: #fbfefd; }
+
+  .cell-name { font-weight: 600; white-space: nowrap; }
+  .cell-category { color: var(--green); font-weight: 600; }
+  .cell-annotation {
+    color: var(--text-muted);
+    line-height: 1.45;
+    max-width: 320px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cell-annotation.empty { color: #b8bdc2; }
+
+  .cell-actions { width: 56px; text-align: right; }
+
+  /* ===== Инлайн-редактирование ===== */
+  .cell-field {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .cell-field .cell-text { flex: 1; min-width: 0; }
+  .cell-field .cell-annotation { flex: 1; }
+
+  .cell-edit {
+    width: 26px; height: 26px;
+    flex-shrink: 0;
+    border: none; background: transparent;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #b8bdc2;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+  }
+  .cell-edit:hover { background: var(--green-light); color: var(--green); transform: scale(1.05); }
+  .cell-edit:active { transform: scale(0.92); }
+  .cell-edit svg { width: 14px; height: 14px; }
+
+  .cell-editing {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .cell-input {
+    flex: 1;
+    min-width: 130px;
+    border: 1.5px solid var(--green);
+    border-radius: 9px;
+    padding: 7px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(1,159,116,0.12);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .cell-input:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(1,159,116,0.16);
+  }
+  .cell-input.invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
+  }
+  .cell-textarea {
+    flex-basis: 100%;
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    line-height: 1.45;
+  }
+
+  .cell-edit-actions { display: flex; gap: 5px; }
+  .cell-btn {
+    width: 28px; height: 28px;
+    border: none; border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+  }
+  .cell-btn:active { transform: scale(0.92); }
+  .cell-btn svg { width: 14px; height: 14px; }
+  .cell-btn.save { background: var(--green); color: #fff; }
+  .cell-btn.save:hover { background: var(--green-dark); }
+  .cell-btn.cancel { background: #f1f3f4; color: var(--text-muted); }
+  .cell-btn.cancel:hover { background: #e7e9eb; color: var(--text); }
+
+  .cell-error {
+    display: none;
+    flex-basis: 100%;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--danger);
+  }
+  .cell-error.show { display: block; }
+
+  .row-delete {
+    width: 30px; height: 30px;
+    border: none; background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #b8bdc2;
+    transition: background 0.2s, color 0.2s;
+  }
+  .row-delete:hover { background: #fdecec; color: var(--danger); }
+  .row-delete svg { width: 16px; height: 16px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .empty-state svg {
+    width: 44px; height: 44px;
+    stroke: #c8cdd2;
+    margin-bottom: 12px;
+  }
+
+  /* ===== Кнопки ===== */
+  .add-btn {
+    background: var(--green); color: #fff;
+    border: none; border-radius: 14px;
+    padding: 13px 18px;
+    font-size: 14px; font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    transition: background 0.2s, transform 0.15s;
+    box-shadow: 0 4px 12px rgba(1,159,116,0.25);
+    white-space: nowrap;
+  }
+  .add-btn:hover { background: var(--green-dark); }
+  .add-btn:active { transform: scale(0.98); }
+  .add-btn svg { width: 18px; height: 18px; }
+
+  /* ===== Модалки ===== */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .modal {
+    background: #fff;
+    border-radius: 20px;
+    padding: 24px;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.25s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-backdrop.open .modal { transform: translateY(0) scale(1); }
+
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+  .modal p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .modal label {
+    display: block;
+    font-size: 12.5px; font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    margin-top: 12px;
+  }
+  .modal label:first-of-type { margin-top: 0; }
+  .modal input,
+  .modal textarea {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: vertical;
+  }
+  .modal textarea { min-height: 96px; line-height: 1.5; }
+  .modal input:focus,
+  .modal textarea:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(1,159,116,0.12);
+  }
+  .modal input.invalid,
+  .modal textarea.invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
+  }
+  .modal-error {
+    display: none;
+    font-size: 12.5px;
+    color: var(--danger);
+    margin-top: 6px;
+    font-weight: 500;
+  }
+  .modal-error.show { display: block; }
+
+  .modal-actions {
+    display: flex; gap: 10px;
+    margin-top: 20px;
+  }
+  .modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 14px; font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn-cancel { background: #f1f3f4; color: var(--text); }
+  .btn-cancel:hover { background: #e7e9eb; }
+  .btn-save { background: var(--green); color: #fff; }
+  .btn-save:hover { background: var(--green-dark); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #c93a3f; }
+  .btn-save:active, .btn-cancel:active, .btn-danger:active { transform: scale(0.98); }
+
+  /* ===== Мобильные ===== */
+  @media (max-width: 640px) {
+    .side-rail { width: 54px; }
+    .main-wrap { margin-left: 54px; padding: 12px; }
+    .panel { border-radius: 16px; }
+    .panel-header { padding: 18px 16px 14px; }
+    .panel-header h1 { font-size: 19px; }
+    .stat-bar { margin: 0 16px 14px; }
+    .table-wrap { padding: 0 16px 16px; }
+    .add-btn { width: 100%; }
+    .cell-annotation { display: none; }
+    thead th:nth-child(3) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="side-rail">
+    <div class="rail-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2.5"/>
+        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        <path d="M12 11.5v5M9.5 14h5"/>
+      </svg>
+    </div>
+
+    <div class="rail-spacer"></div>
+
+    <button class="rail-btn" id="logoutBtn" aria-label="Выйти">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <path d="M16 17l5-5-5-5"/>
+        <path d="M21 12H9"/>
+      </svg>
+      <span class="rail-tooltip">Выйти</span>
+    </button>
+
+    <div class="rail-spacer"></div>
+  </div>
+
+  <div class="main-wrap">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h1>Админ-панель</h1>
+          <p>База знаний медицинских инструкций</p>
+        </div>
+        <button class="add-btn" id="addBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Добавить инструкцию в базу
+        </button>
+      </div>
+
+      <div class="stat-bar">
+        <span class="stat-item">Инструкций в базе: <b id="statCount">0</b></span>
+        <span class="stat-sep">|</span>
+        <span class="stat-item"><span class="stat-dot"></span>Поиск BM25: активен</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Категория</th>
+              <th>Аннотация</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="corpusBody"></tbody>
+        </table>
+        <div class="empty-state" id="corpusEmpty" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          <div>База знаний пуста — добавьте первую инструкцию</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка добавления -->
+<div class="modal-backdrop" id="addBackdrop">
+  <div class="modal">
+    <h3>Новая инструкция</h3>
+    <label for="instrName">Название</label>
+    <input type="text" id="instrName" placeholder="Например: Ибупрофен 200 мг" autocomplete="off">
+    <div class="modal-error" id="instrNameError">Введите название</div>
+
+    <label for="instrCategory">Категория</label>
+    <input type="text" id="instrCategory" placeholder="Например: Обезболивающее" autocomplete="off">
+    <div class="modal-error" id="instrCategoryError">Введите категорию</div>
+
+    <label for="instrAnnotation">Текст аннотации</label>
+    <textarea id="instrAnnotation" placeholder="Показания, дозировка, противопоказания…"></textarea>
+    <div class="modal-error" id="instrAnnotationError">Введите текст аннотации</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelAdd">Отмена</button>
+      <button class="btn-save" id="saveAdd">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка подтверждения удаления -->
+<div class="modal-backdrop" id="confirmBackdrop">
+  <div class="modal">
+    <h3>Удалить инструкцию?</h3>
+    <p id="confirmText">Инструкция будет удалена из базы знаний.</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="confirmCancel">Отмена</button>
+      <button class="btn-danger" id="confirmDelete">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== База знаний =====
+  // Стартовое наполнение — список препаратов из site.html (лист будет расширен)
+  const seedCorpus = [
+    { name: "Парацетамол", tags: ["жар", "боль", "головная боль"] },
+    { name: "Ибупрофен", tags: ["боль", "воспаление", "жар"] },
+    { name: "Аспирин", tags: ["боль", "жар", "разжижение крови"] },
+    { name: "Амоксициллин", tags: ["антибиотик", "инфекции", "ангина"] },
+    { name: "Азитромицин", tags: ["антибиотик", "бронхит", "пневмония"] },
+    { name: "Лоратадин", tags: ["аллергия", "насморк", "зуд"] },
+    { name: "Цетиризин", tags: ["аллергия", "крапивница"] },
+    { name: "Омепразол", tags: ["желудок", "изжога", "гастрит"] },
+    { name: "Смекта", tags: ["диарея", "отравление", "ЖКТ"] },
+    { name: "Регидрон", tags: ["обезвоживание", "диарея", "потеря солей"] },
+    { name: "Активированный уголь", tags: ["отравление", "сорбент"] },
+    { name: "Но-шпа", tags: ["спазмы", "боль в животе"] },
+    { name: "Валерьянка", tags: ["тревога", "бессонница", "нервы"] },
+    { name: "Пустырник", tags: ["успокоительное", "стресс"] },
+    { name: "Витамин C", tags: ["иммунитет", "простуда"] },
+    { name: "Нурофен", tags: ["боль", "жар", "воспаление"] },
+    { name: "ТераФлю", tags: ["простуда", "жар", "насморк"] },
+    { name: "Капли в нос", tags: ["насморк", "заложенность"] }
+  ];
+
+  const STORAGE_KEY = 'medai_corpus';
+  let instructions = loadCorpus();
+
+  function loadCorpus() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (Array.isArray(saved)) return saved;
+    } catch (e) {}
+    return seedCorpus.map((m, i) => ({
+      id: 'doc_' + (i + 1),
+      name: m.name,
+      category: m.tags.join(', '),
+      annotation: ''
+    }));
+  }
+
+  function saveCorpus() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(instructions));
+  }
+
+  const corpusBody = document.getElementById('corpusBody');
+  const corpusEmpty = document.getElementById('corpusEmpty');
+  const statCount = document.getElementById('statCount');
+
+  const trashIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+    </svg>`;
+
+  const emptyIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>`;
+
+  const pencilIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>`;
+
+  const checkIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>`;
+
+  const crossIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>`;
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ===== Инлайн-редактирование =====
+  let editing = null; // { id, field }
+
+  const FIELD_LABELS = {
+    name: 'Введите название',
+    category: 'Введите категорию',
+    annotation: 'Введите текст аннотации'
+  };
+
+  function renderCell(item, field) {
+    if (editing && editing.id === item.id && editing.field === field) {
+      const value = escapeHtml(item[field] || '');
+      const control = field === 'annotation'
+        ? `<textarea class="cell-input cell-textarea" data-field="annotation">${value}</textarea>`
+        : `<input class="cell-input" data-field="${field}" value="${value}">`;
+
+      return `
+        <div class="cell-editing">
+          ${control}
+          <div class="cell-edit-actions">
+            <button class="cell-btn save" title="Сохранить" aria-label="Сохранить">${checkIcon}</button>
+            <button class="cell-btn cancel" title="Отмена" aria-label="Отмена">${crossIcon}</button>
+          </div>
+          <div class="cell-error"></div>
+        </div>
+      `;
+    }
+
+    let body;
+    if (field === 'annotation') {
+      body = item.annotation
+        ? `<div class="cell-annotation" title="${escapeHtml(item.annotation)}">${escapeHtml(item.annotation)}</div>`
+        : `<div class="cell-annotation empty">—</div>`;
+    } else if (field === 'category') {
+      body = `<span class="cell-text">${escapeHtml(item.category || '—')}</span>`;
+    } else {
+      body = `<span class="cell-text">${escapeHtml(item[field])}</span>`;
+    }
+
+    return `
+      <div class="cell-field">
+        ${body}
+        <button class="cell-edit" data-id="${item.id}" data-field="${field}" title="Редактировать" aria-label="Редактировать">${pencilIcon}</button>
+      </div>
+    `;
+  }
+
+  function startEdit(id, field) {
+    if (editing && editing.id === id && editing.field === field) return;
+    editing = { id, field };
+    renderTable();
+    const input = corpusBody.querySelector('.cell-input');
+    if (input) {
+      input.focus();
+      if (input.select) input.select();
+      else input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+
+  function cancelEdit() {
+    if (!editing) return;
+    editing = null;
+    renderTable();
+  }
+
+  function commitEdit() {
+    if (!editing) return;
+
+    const input = corpusBody.querySelector('.cell-input');
+    const errorEl = corpusBody.querySelector('.cell-error');
+    const item = instructions.find(i => i.id === editing.id);
+
+    if (!input || !item || !errorEl) {
+      editing = null;
+      renderTable();
+      return;
+    }
+
+    const field = editing.field;
+    const value = input.value.trim();
+    let error = '';
+
+    if (!value) {
+      error = FIELD_LABELS[field];
+    } else if (field === 'name' && instructions.some(i => i.id !== item.id && i.name.toLowerCase() === value.toLowerCase())) {
+      error = 'Такая инструкция уже есть';
+    }
+
+    if (error) {
+      input.classList.add('invalid');
+      errorEl.textContent = error;
+      errorEl.classList.add('show');
+      input.focus();
+      return;
+    }
+
+    item[field] = value;
+    saveCorpus();
+    editing = null;
+    renderTable();
+  }
+
+  function renderTable() {
+    statCount.textContent = instructions.length;
+
+    if (instructions.length === 0) {
+      corpusBody.innerHTML = '';
+      corpusEmpty.style.display = 'block';
+      corpusEmpty.innerHTML = `${emptyIcon}<div>База знаний пуста — добавьте первую инструкцию</div>`;
+      return;
+    }
+
+    corpusEmpty.style.display = 'none';
+
+    corpusBody.innerHTML = instructions.map(item => `
+      <tr data-id="${item.id}">
+        <td class="cell-name">${renderCell(item, 'name')}</td>
+        <td class="cell-category">${renderCell(item, 'category')}</td>
+        <td>${renderCell(item, 'annotation')}</td>
+        <td class="cell-actions">
+          <button class="row-delete" title="Удалить" aria-label="Удалить">${trashIcon}</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Делегирование кликов: карандашик, сохранить, отмена, удалить
+  corpusBody.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.cell-edit');
+    if (editBtn) {
+      startEdit(editBtn.dataset.id, editBtn.dataset.field);
+      return;
+    }
+    if (e.target.closest('.cell-btn.save')) {
+      commitEdit();
+      return;
+    }
+    if (e.target.closest('.cell-btn.cancel')) {
+      cancelEdit();
+      return;
+    }
+    const deleteBtn = e.target.closest('.row-delete');
+    if (deleteBtn) {
+      askDelete(deleteBtn.closest('tr').dataset.id);
+    }
+  });
+
+  corpusBody.addEventListener('keydown', (e) => {
+    if (!editing) return;
+    const input = e.target.closest('.cell-input');
+    if (!input) return;
+
+    if (e.key === 'Enter' && (input.tagName !== 'TEXTAREA' || e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      commitEdit();
+      return;
+    }
+    if (input.classList.contains('invalid') && input.value.trim()) {
+      input.classList.remove('invalid');
+      const errorEl = corpusBody.querySelector('.cell-error');
+      if (errorEl) errorEl.classList.remove('show');
+    }
+  });
+
+  // ===== Добавление =====
+  const addBackdrop = document.getElementById('addBackdrop');
+  const instrName = document.getElementById('instrName');
+  const instrCategory = document.getElementById('instrCategory');
+  const instrAnnotation = document.getElementById('instrAnnotation');
+  const instrNameError = document.getElementById('instrNameError');
+  const instrCategoryError = document.getElementById('instrCategoryError');
+  const instrAnnotationError = document.getElementById('instrAnnotationError');
+
+  const addFields = [
+    { input: instrName, error: instrNameError },
+    { input: instrCategory, error: instrCategoryError },
+    { input: instrAnnotation, error: instrAnnotationError }
+  ];
+
+  function openAddModal() {
+    addFields.forEach(({ input, error }) => {
+      input.value = '';
+      input.classList.remove('invalid');
+      error.classList.remove('show');
+    });
+    addBackdrop.classList.add('open');
+    setTimeout(() => instrName.focus(), 100);
+  }
+  function closeAddModal() {
+    addBackdrop.classList.remove('open');
+  }
+
+  document.getElementById('addBtn').addEventListener('click', openAddModal);
+  document.getElementById('cancelAdd').addEventListener('click', closeAddModal);
+  addBackdrop.addEventListener('click', (e) => {
+    if (e.target === addBackdrop) closeAddModal();
+  });
+
+  addFields.forEach(({ input, error }) => {
+    input.addEventListener('input', () => {
+      if (input.value.trim()) {
+        input.classList.remove('invalid');
+        error.classList.remove('show');
+      }
+    });
+  });
+
+  document.getElementById('saveAdd').addEventListener('click', () => {
+    const name = instrName.value.trim();
+    const category = instrCategory.value.trim();
+    const annotation = instrAnnotation.value.trim();
+    let ok = true;
+
+    if (!name) {
+      instrName.classList.add('invalid');
+      instrNameError.textContent = 'Введите название';
+      instrNameError.classList.add('show');
+      ok = false;
+    }
+    if (!category) {
+      instrCategory.classList.add('invalid');
+      instrCategoryError.classList.add('show');
+      ok = false;
+    }
+    if (!annotation) {
+      instrAnnotation.classList.add('invalid');
+      instrAnnotationError.classList.add('show');
+      ok = false;
+    }
+    if (!ok) return;
+
+    if (instructions.some(i => i.name.toLowerCase() === name.toLowerCase())) {
+      instrName.classList.add('invalid');
+      instrNameError.textContent = 'Такая инструкция уже есть';
+      instrNameError.classList.add('show');
+      instrName.focus();
+      return;
+    }
+
+    instructions.unshift({
+      id: 'doc_' + Date.now(),
+      name,
+      category,
+      annotation
+    });
+    editing = null;
+    saveCorpus();
+    renderTable();
+    closeAddModal();
+  });
+
+  instrAnnotation.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      document.getElementById('saveAdd').click();
+    }
+  });
+
+  // ===== Удаление =====
+  const confirmBackdrop = document.getElementById('confirmBackdrop');
+  const confirmText = document.getElementById('confirmText');
+  const confirmCancel = document.getElementById('confirmCancel');
+  const confirmDelete = document.getElementById('confirmDelete');
+  let pendingDeleteId = null;
+
+  function askDelete(id) {
+    const item = instructions.find(i => i.id === id);
+    if (!item) return;
+    pendingDeleteId = id;
+    confirmText.textContent = `«${item.name}» будет удалена из базы знаний.`;
+    confirmBackdrop.classList.add('open');
+  }
+  function closeConfirm() {
+    confirmBackdrop.classList.remove('open');
+    pendingDeleteId = null;
+  }
+
+  confirmCancel.addEventListener('click', closeConfirm);
+  confirmBackdrop.addEventListener('click', (e) => {
+    if (e.target === confirmBackdrop) closeConfirm();
+  });
+  confirmDelete.addEventListener('click', () => {
+    if (pendingDeleteId) {
+      instructions = instructions.filter(i => i.id !== pendingDeleteId);
+      editing = null;
+      saveCorpus();
+      renderTable();
+    }
+    closeConfirm();
+  });
+
+  // ===== Выход =====
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_role');
+    localStorage.removeItem('medai_name');
+    localStorage.removeItem('medai_avatar');
+    window.location.href = 'auth.html';
+  });
+
+  // ===== Escape =====
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (confirmBackdrop.classList.contains('open')) closeConfirm();
+      else if (addBackdrop.classList.contains('open')) closeAddModal();
+      else if (editing) cancelEdit();
+    }
+  });
+
+  // ===== Инициализация =====
+  saveCorpus();
+  renderTable();
+</script>
+</body>
+</html>
