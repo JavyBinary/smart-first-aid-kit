@@ -705,6 +705,88 @@
     font-weight: 600;
   }
 
+  /* ===== RAG Карточка ответа MedAI ===== */
+  .rag-card {
+    background: #ffffff;
+    border: 1px solid rgba(1,159,116,0.25);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 560px;
+  }
+  .rag-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; border-bottom: 1px solid #f1f3f5; padding-bottom: 10px;
+  }
+  .rag-card-title {
+    font-size: 16px; font-weight: 700; color: var(--text);
+  }
+  .badge-kit {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; font-weight: 700;
+    padding: 3px 10px; border-radius: 12px;
+    white-space: nowrap;
+  }
+  .badge-kit.in-kit {
+    background: var(--green-light); color: var(--green);
+    border: 1px solid rgba(1,159,116,0.3);
+  }
+  .badge-kit.not-in-kit {
+    background: #f1f3f5; color: var(--text-muted);
+  }
+  .rag-section {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .rag-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text-muted);
+  }
+  .rag-text {
+    font-size: 13.5px; line-height: 1.45; color: var(--text);
+  }
+  .rag-warning {
+    background: #fff8eb; border-left: 3px solid #f59e0b;
+    padding: 8px 12px; border-radius: 6px;
+    font-size: 12.5px; color: #92400e; line-height: 1.4;
+  }
+  .rag-footer {
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 1px solid #f1f3f5; padding-top: 10px;
+  }
+  .rag-source {
+    font-size: 11.5px; color: var(--green-dark); font-weight: 600;
+  }
+  .rag-disclaimer {
+    font-size: 11px; color: var(--text-muted); line-height: 1.35;
+  }
+
+  /* ===== Экстренный Red Flag баннер ===== */
+  .emergency-card {
+    background: #fff5f5;
+    border: 1.5px solid var(--danger);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 16px rgba(229,72,77,0.12);
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 560px;
+  }
+  .emergency-header {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--danger); font-size: 15.5px; font-weight: 700;
+  }
+  .emergency-call {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--danger); color: #fff;
+    padding: 8px 16px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 700; text-decoration: none;
+    align-self: flex-start;
+  }
+  .emergency-steps {
+    font-size: 13px; line-height: 1.5; color: #7f1d1d;
+  }
+  .emergency-steps ol { padding-left: 18px; margin-top: 4px; }
+
   .input-area { padding: 0 20px 20px; flex-shrink: 0; }
 
   .selected-bar {
@@ -954,6 +1036,13 @@
     <label for="newName">Название</label>
     <input type="text" id="newName" placeholder="Например: Парацетамол" autocomplete="off">
     <div class="modal-error" id="newNameError">Введите название</div>
+
+    <label for="newForm">Форма выпуска</label>
+    <input type="text" id="newForm" placeholder="Таблетки, капсулы, спрей, мазь..." autocomplete="off">
+
+    <label for="newDosage">Дозировка</label>
+    <input type="text" id="newDosage" placeholder="Например: 200 мг, 500 мг" autocomplete="off">
+
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelAdd">Отмена</button>
       <button class="btn-save" id="saveAdd">Сохранить</button>
@@ -1078,6 +1167,9 @@
 </div>
 
 <script>
+  // ===== Конфигурация API (FastAPI) =====
+  const API_BASE = 'http://localhost:8000/api/v1';
+
   // ===== Пользователь =====
   let user = {
     name: localStorage.getItem('medai_name') || '',
@@ -1384,22 +1476,32 @@
   });
 
   // ===== Сохранение пароля =====
-  passwordSave.addEventListener('click', () => {
+  passwordSave.addEventListener('click', async () => {
     if (!validatePasswordForm()) return;
 
-    // === ЗДЕСЬ БУДЕТ ЗАПРОС К ВАШЕМУ БЭКЕНДУ ===
-    // fetch('/api/v1/auth/password', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ old_password: oldPassword.value, new_password: newPassword.value })
-    // });
-
     passwordSave.disabled = true;
+
+    try {
+      await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        },
+        body: JSON.stringify({
+          old_password: oldPassword.value,
+          new_password: newPassword.value
+        })
+      });
+    } catch (e) {
+      // Сервер не запущен — штатный локальный режим КТ1
+    }
+
     setTimeout(() => {
       passwordSave.disabled = false;
       passwordSuccess.classList.add('show');
       setTimeout(closePasswordModal, 1200);
-    }, 600);
+    }, 400);
   });
 
   // ===== Выход =====
@@ -1432,27 +1534,58 @@
   });
 
   // ===== Аптечка =====
-  let medications = [
-    { name: "Парацетамол", tags: ["жар", "боль", "головная боль"] },
-    { name: "Ибупрофен", tags: ["боль", "воспаление", "жар"] },
-    { name: "Аспирин", tags: ["боль", "жар", "разжижение крови"] },
-    { name: "Амоксициллин", tags: ["антибиотик", "инфекции", "ангина"] },
-    { name: "Азитромицин", tags: ["антибиотик", "бронхит", "пневмония"] },
-    { name: "Лоратадин", tags: ["аллергия", "насморк", "зуд"] },
-    { name: "Цетиризин", tags: ["аллергия", "крапивница"] },
-    { name: "Омепразол", tags: ["желудок", "изжога", "гастрит"] },
-    { name: "Смекта", tags: ["диарея", "отравление", "ЖКТ"] },
-    { name: "Регидрон", tags: ["обезвоживание", "диарея", "потеря солей"] },
-    { name: "Активированный уголь", tags: ["отравление", "сорбент"] },
-    { name: "Но-шпа", tags: ["спазмы", "боль в животе"] },
-    { name: "Валерьянка", tags: ["тревога", "бессонница", "нервы"] },
-    { name: "Пустырник", tags: ["успокоительное", "стресс"] },
-    { name: "Витамин C", tags: ["иммунитет", "простуда"] },
-    { name: "Нурофен", tags: ["боль", "жар", "воспаление"] },
-    { name: "ТераФлю", tags: ["простуда", "жар", "насморк"] },
-    { name: "Капли в нос", tags: ["насморк", "заложенность"] }
-  ];
+  const KIT_STORAGE_KEY = 'medai_kit';
 
+  function loadKit() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KIT_STORAGE_KEY));
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+    } catch (e) {}
+    return [
+      { id: "kit_1", name: "Ибупрофен", dosage: "200 мг", form: "таблетки", tags: ["боль", "воспаление", "жар", "головная боль"] },
+      { id: "kit_2", name: "Парацетамол", dosage: "500 мг", form: "таблетки", tags: ["жар", "боль", "головная боль"] },
+      { id: "kit_3", name: "Дротаверин", dosage: "40 мг", form: "таблетки", tags: ["спазмы", "боль в животе"] },
+      { id: "kit_4", name: "Аспирин", dosage: "500 мг", form: "таблетки", tags: ["боль", "жар", "разжижение крови"] },
+      { id: "kit_5", name: "Амоксициллин", dosage: "500 мг", form: "капсулы", tags: ["антибиотик", "инфекции", "ангина"] },
+      { id: "kit_6", name: "Лоратадин", dosage: "10 мг", form: "таблетки", tags: ["аллергия", "насморк", "зуд"] },
+      { id: "kit_7", name: "Омепразол", dosage: "20 мг", form: "капсулы", tags: ["желудок", "изжога", "гастрит"] },
+      { id: "kit_8", name: "Смекта", dosage: "3 г", form: "порошок", tags: ["диарея", "отравление", "ЖКТ"] },
+      { id: "kit_9", name: "Пантенол", dosage: "5%", form: "спрей", tags: ["ожоги", "заживление"] }
+    ];
+  }
+
+  function saveKit() {
+    localStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(medications));
+  }
+
+  async function syncKitFromBackend() {
+    try {
+      const res = await fetch(`${API_BASE}/kit`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          medications = data.items.map(it => ({
+            id: it.id || ('kit_' + Date.now()),
+            name: it.name,
+            dosage: it.dosage || '',
+            form: it.form || 'таблетки',
+            tags: it.tags || [it.category || 'общие']
+          }));
+          saveKit();
+          renderTagsFilter();
+          renderList();
+        }
+      }
+    } catch (e) {
+      // Сервер не запущен — штатный автономный режим КТ1
+    }
+  }
+
+  let medications = loadKit();
   let selectedMeds = [];
   let activeTags = new Set();
 
@@ -1539,9 +1672,13 @@
         ? `<div class="med-tags">${med.tags.map(t => `<span class="med-tag">${t}</span>`).join('')}</div>`
         : '';
 
+      const metaInfo = [med.dosage, med.form].filter(Boolean).join(' • ');
+      const metaHTML = metaInfo ? `<div style="font-size:12px;color:var(--text-muted);margin:2px 0 4px;">${metaInfo}</div>` : '';
+
       card.innerHTML = `
         <button class="card-delete" title="Удалить" aria-label="Удалить">${trashIcon}</button>
         <h3>${med.name}</h3>
+        ${metaHTML}
         ${tagsHTML}
       `;
 
@@ -1595,16 +1732,20 @@
 
   searchInput.addEventListener('input', renderList);
 
-  // ===== Добавление =====
+  // ===== Добавление лекарства =====
   const addBtn = document.getElementById('addBtn');
   const modalBackdrop = document.getElementById('modalBackdrop');
   const newName = document.getElementById('newName');
+  const newForm = document.getElementById('newForm');
+  const newDosage = document.getElementById('newDosage');
   const newNameError = document.getElementById('newNameError');
   const cancelAdd = document.getElementById('cancelAdd');
   const saveAdd = document.getElementById('saveAdd');
 
   function openModal() {
     newName.value = '';
+    if (newForm) newForm.value = '';
+    if (newDosage) newDosage.value = '';
     newName.classList.remove('invalid');
     newNameError.classList.remove('show');
     modalBackdrop.classList.add('open');
@@ -1643,16 +1784,45 @@
       return;
     }
 
-    medications.unshift({ name, tags: [] });
+    const form = newForm ? newForm.value.trim() : '';
+    const dosage = newDosage ? newDosage.value.trim() : '';
+
+    const newItem = {
+      id: 'kit_' + Date.now(),
+      name,
+      form: form || 'таблетки',
+      dosage: dosage || '',
+      tags: []
+    };
+
+    medications.unshift(newItem);
+    saveKit();
+    renderTagsFilter();
     renderList();
     closeModal();
+
+    // Фоновая синхронизация с FastAPI Полины
+    fetch(`${API_BASE}/kit/items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+      },
+      body: JSON.stringify({
+        name: newItem.name,
+        dosage: newItem.dosage,
+        form: newItem.form,
+        category: 'Общие',
+        tags: newItem.tags
+      })
+    }).catch(() => {});
   });
 
   newName.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); saveAdd.click(); }
   });
 
-  // ===== Удаление =====
+  // ===== Удаление лекарства =====
   const confirmBackdrop = document.getElementById('confirmBackdrop');
   const confirmText = document.getElementById('confirmText');
   const confirmCancel = document.getElementById('confirmCancel');
@@ -1675,11 +1845,24 @@
   });
   confirmDelete.addEventListener('click', () => {
     if (pendingDeleteName) {
+      const itemToDelete = medications.find(m => m.name === pendingDeleteName);
       medications = medications.filter(m => m.name !== pendingDeleteName);
       selectedMeds = selectedMeds.filter(n => n !== pendingDeleteName);
+      saveKit();
+      renderTagsFilter();
       renderList();
       renderSelectedBar();
       updateSendBtn();
+
+      // Фоновое удаление на сервере FastAPI
+      if (itemToDelete && itemToDelete.id) {
+        fetch(`${API_BASE}/kit/items/${itemToDelete.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+          }
+        }).catch(() => {});
+      }
     }
     closeConfirm();
   });
@@ -1716,7 +1899,7 @@
     }
   });
 
-  // ===== Чат =====
+  // ===== Чат и RAG-ответы =====
   const messages = document.getElementById('messages');
   const input = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
@@ -1772,43 +1955,137 @@
     if (t) t.remove();
   }
 
-  function generateReply(text) {
-    const q = text.toLowerCase();
-    const mentioned = medications.filter(m => q.includes(m.name.toLowerCase()));
-
-    if (mentioned.length === 1) {
-      const m = mentioned[0];
-      const tagsText = (m.tags && m.tags.length)
-        ? `применяется при: ${m.tags.join(', ')}.`
-        : `теги пока не назначены — скоро их проставит нейросеть.`;
-      return `Про <span class="med-name">${m.name}</span>: ${tagsText}<br><br>
-        ⚠️ Перед применением уточните дозировку у врача.`;
+  // Рендеринг структурированного ответа (RAG / Red Flag / текст)
+  function renderBotResponse(data) {
+    if (data.emergency_mode) {
+      return `
+        <div class="emergency-card">
+          <div class="emergency-header">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>${data.emergency_title || 'Экстренное состояние: неотложная помощь'}</span>
+          </div>
+          <div class="emergency-call">
+            Вызов скорой медицинской помощи: 112
+          </div>
+          <div class="emergency-steps">
+            <strong>Алгоритм первой доврачебной помощи:</strong>
+            <ol>
+              ${(data.emergency_steps || []).map(s => `<li>${s}</li>`).join('')}
+            </ol>
+          </div>
+          <div class="rag-disclaimer">${data.disclaimer || 'При угрожающих состояниях немедленно вызовите врача.'}</div>
+        </div>
+      `;
     }
 
-    if (mentioned.length > 1) {
-      const list = mentioned.map(m =>
-        `• <span class="med-name">${m.name}</span>${m.tags && m.tags.length ? ' — ' + m.tags.join(', ') : ''}`
-      ).join('<br>');
-      return `Разбираю по препаратам:<br><br>${list}
-        <br><br>⚠️ Не смешивайте без консультации врача.`;
+    if (data.recommendation) {
+      const rec = data.recommendation;
+      const badgeClass = rec.in_user_kit ? 'in-kit' : 'not-in-kit';
+      const badgeText = rec.in_user_kit ? '✓ Есть в вашей аптечке' : '✕ Нет в наличии дома';
+
+      return `
+        <div class="rag-card">
+          <div class="rag-card-header">
+            <div class="rag-card-title">${rec.medicine_name} ${rec.dosage_form ? `<span style="font-size:13px;color:var(--text-muted);font-weight:400;">(${rec.dosage_form})</span>` : ''}</div>
+            <span class="badge-kit ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="rag-section">
+            <span class="rag-label">Режим дозирования</span>
+            <div class="rag-text">${rec.dosage}</div>
+          </div>
+          <div class="rag-section">
+            <span class="rag-label">Противопоказания</span>
+            <div class="rag-text">${rec.contraindications}</div>
+          </div>
+          ${rec.warnings ? `
+            <div class="rag-warning">
+              <strong>Внимание:</strong> ${rec.warnings}
+            </div>` : ''}
+          <div class="rag-footer">
+            ${data.sources && data.sources.length ? `
+              <div class="rag-source">Источник: ${data.sources[0].title}</div>` : ''}
+            <div class="rag-disclaimer">${data.disclaimer || 'Информация носит ознакомительный характер на основе официальной инструкции.'}</div>
+          </div>
+        </div>
+      `;
     }
 
-    const matched = medications.filter(m =>
-      m.tags && m.tags.some(tag => q.includes(tag.toLowerCase()))
-    );
-    if (matched.length) {
-      const list = matched.slice(0, 3).map(m =>
-        `• <span class="med-name">${m.name}</span> — ${m.tags.join(', ')}`
-      ).join('<br>');
-      return `Возможные варианты:<br><br>${list}
-        <br><br><span style="color:#7a7f85;font-size:13px;">Это не заменяет консультацию врача.</span>`;
-    }
-
-    return `Уточните, пожалуйста, симптомы: температура, боль, кашель, аллергия, проблемы с ЖКТ?
-      Также можете выбрать лекарства из аптечки слева.`;
+    return data.text_message || 'Уточните, пожалуйста, симптомы или выберите препарат из аптечки слева.';
   }
 
-  function send() {
+  // Генератор эталонного ответа (демо-режим прототипа КТ1 по spec/)
+  function generateMockReply(queryText, selectedList) {
+    const q = (queryText + ' ' + selectedList.join(' ')).toLowerCase();
+
+    // Экстренный сценарий UC-04 (Red Flag)
+    if (q.includes('ожог') || q.includes('кров') || q.includes('сознани') || q.includes('удушь')) {
+      return {
+        status: "success",
+        emergency_mode: true,
+        emergency_title: "Экстренное состояние: Термический ожог / Травма",
+        emergency_phone: "112",
+        emergency_steps: [
+          "Немедленно охлаждайте место поражения чистой проточной водой в течение 15 минут.",
+          "Наложите сухую стерильную марлевую повязку. Не вскрывайте пузыри и не удаляйте прилипшую одежду.",
+          "Категорически запрещено смазывать ожог маслом, жиром, спиртом или непроверенными мазями.",
+          "При тяжелом состоянии немедленно позвоните по единому номеру 112."
+        ],
+        disclaimer: "При угрожающих состояниях стандартные доврачебные рекомендации блокируются."
+      };
+    }
+
+    // Основной сценарий UC-01 (Острая боль, головная боль, Ибупрофен)
+    if (q.includes('голов') || q.includes('бол') || q.includes('висок') || q.includes('ибупрофен')) {
+      const inKit = medications.some(m => m.name.toLowerCase().includes('ибупрофен'));
+      return {
+        status: "success",
+        emergency_mode: false,
+        recommendation: {
+          medicine_name: "Ибупрофен",
+          dosage_form: "таблетки 200 мг",
+          in_user_kit: inKit,
+          dosage: "1 таблетка (200 мг) внутрь после еды, запивая стаканом воды. Повторный приём допускается не ранее чем через 4–6 часов.",
+          contraindications: "Эрозивно-язвенные заболевания ЖКТ в фазе обострения, тяжёлая почечная недостаточность, III триместр беременности.",
+          warnings: "Максимальная суточная доза для взрослых — 1200 мг (6 таблеток). Не принимать более 3–5 дней подряд без назначения врача."
+        },
+        sources: [
+          { doc_id: "doc_001", title: "Инструкция Минздрава РФ ЛП-001234: Ибупрофен 200мг", bm25_score: 14.82 }
+        ],
+        disclaimer: "Информация носит исключительно ознакомительный характер. При усилении симптомов обратитесь к врачу."
+      };
+    }
+
+    // Если упомянут конкретный препарат из наличия
+    const mentioned = medications.filter(m => q.includes(m.name.toLowerCase()));
+    if (mentioned.length > 0) {
+      const m = mentioned[0];
+      return {
+        status: "success",
+        emergency_mode: false,
+        recommendation: {
+          medicine_name: m.name,
+          dosage_form: [m.dosage, m.form].filter(Boolean).join(', ') || 'таблетки',
+          in_user_kit: true,
+          dosage: "Применять в строгом соответствии с официальной аннотацией препарата: 1 доза после еды.",
+          contraindications: "Индивидуальная непереносимость компонентов, острые заболевания ЖКТ.",
+          warnings: "Соблюдайте интервал между приемами не менее 4–6 часов."
+        },
+        sources: [
+          { doc_id: "doc_med", title: `Официальная инструкция: ${m.name}`, bm25_score: 12.4 }
+        ],
+        disclaimer: "Сервис носит справочный характер. Перед приёмом ознакомьтесь с инструкцией."
+      };
+    }
+
+    return {
+      status: "info",
+      emergency_mode: false,
+      text_message: "Уточните симптомы недомогания (например: головная боль, жар, спазм) или прикрепите препараты из вашей аптечки слева для анализа совместимости."
+    };
+  }
+
+  // Отправка запроса с попыткой вызова FastAPI и fallback
+  async function send() {
     const text = input.value.trim();
     const meds = [...selectedMeds];
     if (!text && meds.length === 0) return;
@@ -1829,10 +2106,36 @@
     autoResize();
 
     addTyping();
+
+    // 1. Попытка запроса к реальному бэкенду Полины
+    try {
+      const res = await fetch(`${API_BASE}/chat/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        },
+        body: JSON.stringify({
+          query: query,
+          include_kit_context: true
+        })
+      });
+      if (res.ok) {
+        const apiData = await res.json();
+        removeTyping();
+        addMessage(renderBotResponse(apiData), 'bot');
+        return;
+      }
+    } catch (e) {
+      // Сервер не запущен — штатный режим демонстрации КТ1
+    }
+
+    // 2. Демо-ответ по контракту spec/
     setTimeout(() => {
       removeTyping();
-      addMessage(generateReply(query), 'bot');
-    }, 700 + Math.random() * 500);
+      const mockData = generateMockReply(text, meds);
+      addMessage(renderBotResponse(mockData), 'bot');
+    }, 700 + Math.random() * 400);
   }
 
   sendBtn.addEventListener('click', send);
@@ -1847,6 +2150,7 @@
   renderTagsFilter();
   renderList();
   renderSelectedBar();
+  syncKitFromBackend();
 </script>
 </body>
 </html>

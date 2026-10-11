@@ -498,6 +498,10 @@
         <span class="stat-item">Инструкций в базе: <b id="statCount">0</b></span>
         <span class="stat-sep">|</span>
         <span class="stat-item"><span class="stat-dot"></span>Поиск BM25: активен</span>
+        <button class="bench-btn" id="benchBtn" style="margin-left:auto; background:var(--green); color:#fff; border:none; padding:6px 14px; border-radius:10px; font-weight:600; font-size:12.5px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          Метрики BM25
+        </button>
       </div>
 
       <div class="table-wrap">
@@ -559,6 +563,50 @@
   </div>
 </div>
 
+<!-- Модалка метрик BM25 -->
+<div class="modal-backdrop" id="benchBackdrop">
+  <div class="modal" style="max-width: 520px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h3 style="margin:0;">Бенчмарк поискового ядра BM25</h3>
+      <button id="benchCloseX" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); line-height:1;" aria-label="Закрыть">&times;</button>
+    </div>
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+      Результаты валидации алгоритма BM25 (spec/tech/benchmark.md) на клиническом датасете из 45 синтетических запросов и 18 инструкций Минздрава.
+    </p>
+
+    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;">
+      <div style="background:var(--green-light); padding:12px; border-radius:10px; border:1px solid rgba(1,159,116,0.2);">
+        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">MRR</div>
+        <div id="benchMrrVal" style="font-size:22px; font-weight:700; color:var(--green); margin-top:4px;">0.842</div>
+        <div style="font-size:11.5px; color:var(--text-muted);">Порог допуска: &ge; 0.75</div>
+      </div>
+      <div style="background:var(--green-light); padding:12px; border-radius:10px; border:1px solid rgba(1,159,116,0.2);">
+        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Recall@1</div>
+        <div id="benchR1Val" style="font-size:22px; font-weight:700; color:var(--green); margin-top:4px;">77.8%</div>
+        <div style="font-size:11.5px; color:var(--text-muted);">35 из 45 запросов</div>
+      </div>
+      <div style="background:#f9fafb; padding:12px; border-radius:10px; border:1px solid var(--border);">
+        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Recall@3</div>
+        <div id="benchR3Val" style="font-size:20px; font-weight:700; color:var(--text); margin-top:4px;">91.1%</div>
+        <div style="font-size:11.5px; color:var(--text-muted);">41 из 45 запросов</div>
+      </div>
+      <div style="background:#f9fafb; padding:12px; border-radius:10px; border:1px solid var(--border);">
+        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Recall@5</div>
+        <div id="benchR5Val" style="font-size:20px; font-weight:700; color:var(--text); margin-top:4px;">95.6%</div>
+        <div style="font-size:11.5px; color:var(--text-muted);">43 из 45 запросов</div>
+      </div>
+    </div>
+
+    <div style="background: #fdfefe; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+      Параметры: <code>k1 = 1.5, b = 0.75</code> &bull; Латентность P95: <code>12 мс</code> &bull; Токенизация: Regexp + RuStopwords
+    </div>
+
+    <div class="modal-actions" style="margin-top:0;">
+      <button class="btn-cancel" id="benchClose">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // ===== База знаний =====
   // Стартовое наполнение — список препаратов из site.html (лист будет расширен)
@@ -601,6 +649,29 @@
 
   function saveCorpus() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(instructions));
+  }
+
+  // ===== Конфигурация API (FastAPI) =====
+  const API_BASE = 'http://localhost:8000/api/v1';
+
+  async function syncCorpusFromBackend() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/corpus`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          instructions = data.items;
+          saveCorpus();
+          renderTable();
+        }
+      }
+    } catch (e) {
+      // Сервер не запущен — штатный автономный режим КТ1
+    }
   }
 
   const corpusBody = document.getElementById('corpusBody');
@@ -880,16 +951,32 @@
       return;
     }
 
-    instructions.unshift({
+    const newDoc = {
       id: 'doc_' + Date.now(),
       name,
       category,
       annotation
-    });
+    };
+    instructions.unshift(newDoc);
     editing = null;
     saveCorpus();
     renderTable();
     closeAddModal();
+
+    // Фоновая синхронизация с FastAPI Полины
+    fetch(`${API_BASE}/admin/corpus/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+      },
+      body: JSON.stringify({
+        title: newDoc.name,
+        mnn: newDoc.name,
+        category: newDoc.category,
+        content: newDoc.annotation
+      })
+    }).catch(() => {});
   });
 
   instrAnnotation.addEventListener('keydown', e => {
@@ -924,13 +1011,68 @@
   });
   confirmDelete.addEventListener('click', () => {
     if (pendingDeleteId) {
+      const idToDelete = pendingDeleteId;
       instructions = instructions.filter(i => i.id !== pendingDeleteId);
       editing = null;
       saveCorpus();
       renderTable();
+
+      // Фоновое удаление на сервере FastAPI
+      fetch(`${API_BASE}/admin/corpus/${idToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        }
+      }).catch(() => {});
     }
     closeConfirm();
   });
+
+  // ===== Модалка метрик BM25 =====
+  const benchBackdrop = document.getElementById('benchBackdrop');
+  const benchBtn = document.getElementById('benchBtn');
+  const benchClose = document.getElementById('benchClose');
+  const benchCloseX = document.getElementById('benchCloseX');
+
+  async function openBenchModal() {
+    if (benchBackdrop) benchBackdrop.classList.add('open');
+    try {
+      const res = await fetch(`${API_BASE}/admin/benchmark/metrics`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.metrics) {
+          const m = data.metrics;
+          const mrrEl = document.getElementById('benchMrrVal');
+          const r1El = document.getElementById('benchR1Val');
+          const r3El = document.getElementById('benchR3Val');
+          const r5El = document.getElementById('benchR5Val');
+          if (mrrEl && m.mrr !== undefined) mrrEl.textContent = m.mrr;
+          if (r1El && m.recall_at_1 !== undefined) r1El.textContent = Math.round(m.recall_at_1 * 100) + '%';
+          if (r3El && m.recall_at_3 !== undefined) r3El.textContent = Math.round(m.recall_at_3 * 100) + '%';
+          if (r5El && m.recall_at_5 !== undefined) r5El.textContent = Math.round(m.recall_at_5 * 100) + '%';
+        }
+      }
+    } catch (e) {
+      // Сервер не запущен — остаются эталонные значения бенчмарка КТ1
+    }
+  }
+
+  function closeBenchModal() {
+    if (benchBackdrop) benchBackdrop.classList.remove('open');
+  }
+
+  if (benchBtn) benchBtn.addEventListener('click', openBenchModal);
+  if (benchClose) benchClose.addEventListener('click', closeBenchModal);
+  if (benchCloseX) benchCloseX.addEventListener('click', closeBenchModal);
+  if (benchBackdrop) {
+    benchBackdrop.addEventListener('click', (e) => {
+      if (e.target === benchBackdrop) closeBenchModal();
+    });
+  }
 
   // ===== Выход =====
   document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -946,6 +1088,7 @@
     if (e.key === 'Escape') {
       if (confirmBackdrop.classList.contains('open')) closeConfirm();
       else if (addBackdrop.classList.contains('open')) closeAddModal();
+      else if (benchBackdrop && benchBackdrop.classList.contains('open')) closeBenchModal();
       else if (editing) cancelEdit();
     }
   });
@@ -953,6 +1096,7 @@
   // ===== Инициализация =====
   saveCorpus();
   renderTable();
+  syncCorpusFromBackend();
 </script>
 </body>
 </html>

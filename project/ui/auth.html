@@ -437,8 +437,11 @@
     }
   }
 
+  // ===== Базовый URL API =====
+  const API_BASE = 'http://localhost:8000/api/v1';
+
   // ===== Вход =====
-  loginForm.addEventListener('submit', (e) => {
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearErrors(loginForm);
 
@@ -454,30 +457,40 @@
     const btn = document.getElementById('loginBtn');
     setLoading(btn, true);
 
-    // === ЗДЕСЬ БУДЕТ ЗАПРОС К ВАШЕМУ БЭКЕНДУ ===
-    // fetch('/api/login', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ email, password })
-    // })
-    // .then(r => r.json())
-    // .then(data => {
-    //   localStorage.setItem('token', data.token);
-    //   window.location.href = 'site.html';
-    // });
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('medai_token', data.token || '');
+        localStorage.setItem('medai_user', data.user.email);
+        localStorage.setItem('medai_name', data.user.name || '');
+        localStorage.setItem('medai_role', data.user.role || 'user');
+        setLoading(btn, false);
+        window.location.href = data.user.role === 'admin' ? 'admin.html' : 'site.html';
+        return;
+      }
+    } catch (err) {
+      // Бэкенд не запущен — штатный режим демонстрации прототипа (КТ1)
+    }
 
     setTimeout(() => {
-      console.log('Вход:', { email, password });
       const isAdmin = email.trim().toLowerCase() === 'admin@medai.ru';
       localStorage.setItem('medai_user', email);
       localStorage.setItem('medai_role', isAdmin ? 'admin' : 'user');
+      if (!localStorage.getItem('medai_name')) {
+        localStorage.setItem('medai_name', email.split('@')[0]);
+      }
       setLoading(btn, false);
       window.location.href = isAdmin ? 'admin.html' : 'site.html';
-    }, 900);
+    }, 600);
   });
 
   // ===== Регистрация =====
-  registerForm.addEventListener('submit', (e) => {
+  registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearErrors(registerForm);
 
@@ -497,20 +510,33 @@
     const btn = document.getElementById('registerBtn');
     setLoading(btn, true);
 
-    // === ЗДЕСЬ БУДЕТ ЗАПРОС К ВАШЕМУ БЭКЕНДУ ===
-    // fetch('/api/register', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ name, email, password })
-    // });
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('medai_token', data.token || '');
+        localStorage.setItem('medai_user', data.user.email);
+        localStorage.setItem('medai_name', data.user.name || name);
+        localStorage.setItem('medai_role', 'user');
+        setLoading(btn, false);
+        window.location.href = 'site.html';
+        return;
+      }
+    } catch (err) {
+      // Бэкенд не запущен — штатный режим демонстрации прототипа (КТ1)
+    }
 
     setTimeout(() => {
-      console.log('Регистрация:', { name, email, password });
       localStorage.setItem('medai_user', email);
+      localStorage.setItem('medai_name', name);
       localStorage.setItem('medai_role', 'user');
       setLoading(btn, false);
       window.location.href = 'site.html';
-    }, 900);
+    }, 600);
   });
 </script>
 </body>
