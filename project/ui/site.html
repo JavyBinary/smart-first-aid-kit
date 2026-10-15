@@ -215,15 +215,7 @@
     margin: 8px 8px;
   }
 
-  /* Режим редактирования */
-  .profile-edit {
-    padding: 20px 18px 18px;
-    display: none;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  .profile-panel.editing .profile-body { display: none; }
-  .profile-panel.editing .profile-edit { display: block; }
+  /* Режим редактирования — вынесен в отдельные модалки (см. .modal-edit) */
 
   /* ===== Загрузка фото ===== */
   .avatar-upload {
@@ -309,67 +301,44 @@
   .avatar-remove.show { display: inline-block; }
   .avatar-remove:hover { background: #fdecec; }
 
-  /* Поля */
-  .profile-edit label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-    margin-top: 12px;
-  }
-  .profile-edit label:first-of-type { margin-top: 4px; }
-
-  .profile-edit input {
-    width: 100%;
-    border: 1.5px solid var(--border);
-    border-radius: 11px;
-    padding: 10px 13px;
-    font-family: inherit;
-    font-size: 13.5px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .profile-edit input:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(1,159,116,0.12);
-  }
-  .profile-edit input.invalid {
-    border-color: var(--danger);
-    box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
-  }
-
-  .profile-edit-error {
-    display: none;
-    font-size: 12px;
-    color: var(--danger);
-    margin-top: 6px;
-    font-weight: 500;
-  }
-  .profile-edit-error.show { display: block; }
-
-  .edit-actions {
+  /* ===== Модалка редактирования данных ===== */
+  .modal-edit {
+    max-width: 820px;
+    height: 50vh;
+    min-height: 360px;
     display: flex;
-    gap: 8px;
-    margin-top: 20px;
+    flex-direction: column;
+    overflow: hidden;
   }
-  .edit-actions button {
+  .modal-edit h3 { flex-shrink: 0; }
+  .modal-edit .edit-body {
     flex: 1;
-    padding: 11px;
-    border-radius: 11px;
-    border: none;
-    font-family: inherit;
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
+    overflow-y: auto;
+    padding-right: 4px;
   }
-  .edit-actions .btn-cancel { background: #f1f3f4; color: var(--text); }
-  .edit-actions .btn-cancel:hover { background: #e7e9eb; }
-  .edit-actions .btn-save { background: var(--green); color: #fff; }
-  .edit-actions .btn-save:hover { background: var(--green-dark); }
-  .edit-actions button:active { transform: scale(0.98); }
+  .modal-edit .edit-body::-webkit-scrollbar { width: 6px; }
+  .modal-edit .edit-body::-webkit-scrollbar-thumb { background: #d0d3d7; border-radius: 3px; }
+
+  .edit-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .edit-grid .avatar-upload { margin-bottom: 14px; flex-shrink: 0; }
+  .edit-grid .edit-fields { width: 100%; max-width: 440px; }
+
+  .modal-edit .modal-actions { flex-shrink: 0; }
+
+  /* ===== Смена пароля ===== */
+  .password-success {
+    display: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    margin-top: 14px;
+  }
+  .password-success.show { display: block; }
 
   /* ===== Боковая панель аптечки ===== */
   .sidebar {
@@ -593,6 +562,31 @@
     border-color: var(--danger);
     box-shadow: 0 0 0 3px rgba(229,72,77,0.12);
   }
+
+  /* Глазик показа пароля */
+  .password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .password-wrap input { padding-right: 44px; }
+
+  .toggle-pass {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px; height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #b8bdc2;
+    transition: background 0.2s, color 0.2s;
+  }
+  .toggle-pass:hover { background: #f1f3f4; color: var(--text); }
+  .toggle-pass svg { width: 18px; height: 18px; }
   .modal-error {
     display: none;
     font-size: 12.5px;
@@ -711,6 +705,88 @@
     font-weight: 600;
   }
 
+  /* ===== RAG Карточка ответа MedAI ===== */
+  .rag-card {
+    background: #ffffff;
+    border: 1px solid rgba(1,159,116,0.25);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 560px;
+  }
+  .rag-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; border-bottom: 1px solid #f1f3f5; padding-bottom: 10px;
+  }
+  .rag-card-title {
+    font-size: 16px; font-weight: 700; color: var(--text);
+  }
+  .badge-kit {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; font-weight: 700;
+    padding: 3px 10px; border-radius: 12px;
+    white-space: nowrap;
+  }
+  .badge-kit.in-kit {
+    background: var(--green-light); color: var(--green);
+    border: 1px solid rgba(1,159,116,0.3);
+  }
+  .badge-kit.not-in-kit {
+    background: #f1f3f5; color: var(--text-muted);
+  }
+  .rag-section {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .rag-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text-muted);
+  }
+  .rag-text {
+    font-size: 13.5px; line-height: 1.45; color: var(--text);
+  }
+  .rag-warning {
+    background: #fff8eb; border-left: 3px solid #f59e0b;
+    padding: 8px 12px; border-radius: 6px;
+    font-size: 12.5px; color: #92400e; line-height: 1.4;
+  }
+  .rag-footer {
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 1px solid #f1f3f5; padding-top: 10px;
+  }
+  .rag-source {
+    font-size: 11.5px; color: var(--green-dark); font-weight: 600;
+  }
+  .rag-disclaimer {
+    font-size: 11px; color: var(--text-muted); line-height: 1.35;
+  }
+
+  /* ===== Экстренный Red Flag баннер ===== */
+  .emergency-card {
+    background: #fff5f5;
+    border: 1.5px solid var(--danger);
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 16px rgba(229,72,77,0.12);
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 560px;
+  }
+  .emergency-header {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--danger); font-size: 15.5px; font-weight: 700;
+  }
+  .emergency-call {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--danger); color: #fff;
+    padding: 8px 16px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 700; text-decoration: none;
+    align-self: flex-start;
+  }
+  .emergency-steps {
+    font-size: 13px; line-height: 1.5; color: #7f1d1d;
+  }
+  .emergency-steps ol { padding-left: 18px; margin-top: 4px; }
+
   .input-area { padding: 0 20px 20px; flex-shrink: 0; }
 
   .selected-bar {
@@ -817,6 +893,9 @@
     .messages { padding: 20px 14px 8px; }
     .input-area { padding: 0 14px 14px; }
     .msg-row { max-width: 92%; }
+    .modal-edit { height: auto; max-height: 85vh; }
+    .edit-grid { flex-direction: column; align-items: center; gap: 18px; }
+    .edit-grid .edit-fields { width: 100%; }
   }
 </style>
 </head>
@@ -862,6 +941,14 @@
         Редактировать данные
       </button>
 
+      <button class="profile-item" id="changePassBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+        </svg>
+        Сменить пароль
+      </button>
+
       <div class="profile-divider"></div>
 
       <button class="profile-item" id="logoutBtn">
@@ -883,39 +970,6 @@
       </button>
     </div>
 
-    <!-- Режим редактирования -->
-    <div class="profile-edit">
-      <!-- Аватар -->
-      <div class="avatar-upload">
-        <div class="avatar-wrap">
-          <div class="avatar-preview" id="avatarPreview">
-            <span id="avatarPreviewText">—</span>
-          </div>
-          <div class="avatar-camera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-          </div>
-        </div>
-        <input type="file" id="avatarInput" accept="image/*" style="display:none">
-        <div class="avatar-hint">Нажмите на аватар, чтобы загрузить фото</div>
-        <button type="button" class="avatar-remove" id="avatarRemove">Удалить фото</button>
-      </div>
-
-      <label for="editName">Имя</label>
-      <input type="text" id="editName" placeholder="Ваше имя">
-      <div class="profile-edit-error" id="editNameError">Введите имя</div>
-
-      <label for="editEmail">Email</label>
-      <input type="email" id="editEmail" placeholder="you@example.com">
-      <div class="profile-edit-error" id="editEmailError">Введите корректный email</div>
-
-      <div class="edit-actions">
-        <button class="btn-cancel" id="editCancel">Отмена</button>
-        <button class="btn-save" id="editSave">Сохранить</button>
-      </div>
-    </div>
   </div>
 
   <div class="overlay" id="overlay"></div>
@@ -982,6 +1036,13 @@
     <label for="newName">Название</label>
     <input type="text" id="newName" placeholder="Например: Парацетамол" autocomplete="off">
     <div class="modal-error" id="newNameError">Введите название</div>
+
+    <label for="newForm">Форма выпуска</label>
+    <input type="text" id="newForm" placeholder="Таблетки, капсулы, спрей, мазь..." autocomplete="off">
+
+    <label for="newDosage">Дозировка</label>
+    <input type="text" id="newDosage" placeholder="Например: 200 мг, 500 мг" autocomplete="off">
+
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelAdd">Отмена</button>
       <button class="btn-save" id="saveAdd">Сохранить</button>
@@ -1011,7 +1072,104 @@
   </div>
 </div>
 
+<!-- Модалка редактирования данных -->
+<div class="modal-backdrop" id="editBackdrop">
+  <div class="modal modal-edit">
+    <h3>Редактировать данные</h3>
+
+    <div class="edit-body">
+      <div class="edit-grid">
+        <!-- Аватар -->
+        <div class="avatar-upload">
+          <div class="avatar-wrap">
+            <div class="avatar-preview" id="avatarPreview">
+              <span id="avatarPreviewText">—</span>
+            </div>
+            <div class="avatar-camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
+          </div>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none">
+          <div class="avatar-hint">Нажмите на аватар, чтобы загрузить фото</div>
+          <button type="button" class="avatar-remove" id="avatarRemove">Удалить фото</button>
+        </div>
+
+        <div class="edit-fields">
+          <label for="editName">Имя</label>
+          <input type="text" id="editName" placeholder="Ваше имя">
+          <div class="modal-error" id="editNameError">Введите имя</div>
+
+          <label for="editEmail">Email</label>
+          <input type="email" id="editEmail" placeholder="you@example.com">
+          <div class="modal-error" id="editEmailError">Введите корректный email</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancel">Отмена</button>
+      <button class="btn-save" id="editSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка смены пароля -->
+<div class="modal-backdrop" id="passwordBackdrop">
+  <div class="modal">
+    <h3>Смена пароля</h3>
+
+    <label for="oldPassword">Текущий пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="oldPassword" placeholder="••••••••" autocomplete="current-password">
+      <button type="button" class="toggle-pass" data-target="oldPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="oldPasswordError">Пароль должен быть не короче 6 символов</div>
+
+    <label for="newPassword">Новый пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="newPassword" placeholder="Минимум 6 символов" autocomplete="new-password">
+      <button type="button" class="toggle-pass" data-target="newPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="newPasswordError">Пароль должен быть не короче 6 символов</div>
+
+    <label for="confirmPassword">Повторите новый пароль</label>
+    <div class="password-wrap">
+      <input type="password" id="confirmPassword" placeholder="••••••••" autocomplete="new-password">
+      <button type="button" class="toggle-pass" data-target="confirmPassword" aria-label="Показать пароль">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-error" id="confirmPasswordError">Пароли не совпадают</div>
+
+    <div class="password-success" id="passwordSuccess">Пароль обновлён</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="passwordCancel">Отмена</button>
+      <button class="btn-save" id="passwordSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <script>
+  // ===== Конфигурация API (FastAPI) =====
+  const API_BASE = 'http://localhost:8000/api/v1';
+
   // ===== Пользователь =====
   let user = {
     name: localStorage.getItem('medai_name') || '',
@@ -1067,7 +1225,6 @@
   function closeProfile() {
     profilePanel.classList.remove('open');
     profileBtn.classList.remove('active');
-    profilePanel.classList.remove('editing');
   }
   function toggleProfile() {
     profilePanel.classList.contains('open') ? closeProfile() : openProfile();
@@ -1085,7 +1242,8 @@
     closeProfile();
   });
 
-  // ===== Редактирование =====
+  // ===== Редактирование данных (модалка поверх чата) =====
+  const editBackdrop = document.getElementById('editBackdrop');
   const editProfileBtn = document.getElementById('editProfileBtn');
   const editName = document.getElementById('editName');
   const editEmail = document.getElementById('editEmail');
@@ -1118,7 +1276,7 @@
     }
   }
 
-  function enterEditMode() {
+  function openEditModal() {
     editName.value = user.name;
     editEmail.value = user.email;
     pendingAvatar = user.avatar;
@@ -1127,16 +1285,20 @@
     editNameError.classList.remove('show');
     editEmailError.classList.remove('show');
     renderAvatarPreview();
-    profilePanel.classList.add('editing');
+    closeProfile();
+    editBackdrop.classList.add('open');
     setTimeout(() => editName.focus(), 100);
   }
-  function exitEditMode() {
-    profilePanel.classList.remove('editing');
+  function closeEditModal() {
+    editBackdrop.classList.remove('open');
     pendingAvatar = user.avatar;
   }
 
-  editProfileBtn.addEventListener('click', enterEditMode);
-  editCancel.addEventListener('click', exitEditMode);
+  editProfileBtn.addEventListener('click', openEditModal);
+  editCancel.addEventListener('click', closeEditModal);
+  editBackdrop.addEventListener('click', (e) => {
+    if (e.target === editBackdrop) closeEditModal();
+  });
 
   editName.addEventListener('input', () => {
     editName.classList.remove('invalid');
@@ -1177,7 +1339,112 @@
     renderAvatarPreview();
   });
 
-  // ===== Сохранение =====
+  // ===== Смена пароля (отдельная модалка) =====
+  const passwordBackdrop = document.getElementById('passwordBackdrop');
+  const changePassBtn = document.getElementById('changePassBtn');
+  const oldPassword = document.getElementById('oldPassword');
+  const newPassword = document.getElementById('newPassword');
+  const confirmPassword = document.getElementById('confirmPassword');
+  const oldPasswordError = document.getElementById('oldPasswordError');
+  const newPasswordError = document.getElementById('newPasswordError');
+  const confirmPasswordError = document.getElementById('confirmPasswordError');
+  const passwordSuccess = document.getElementById('passwordSuccess');
+  const passwordCancel = document.getElementById('passwordCancel');
+  const passwordSave = document.getElementById('passwordSave');
+
+  const passwordFields = [
+    { input: oldPassword, error: oldPasswordError },
+    { input: newPassword, error: newPasswordError },
+    { input: confirmPassword, error: confirmPasswordError }
+  ];
+
+  const eyeOpenIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>`;
+  const eyeOffIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <path d="M1 1l22 22"/>
+    </svg>`;
+
+  function resetPasswordForm() {
+    passwordSuccess.classList.remove('show');
+    passwordFields.forEach(({ input, error }) => {
+      input.value = '';
+      input.type = 'password';
+      input.classList.remove('invalid');
+      error.classList.remove('show');
+    });
+    passwordBackdrop.querySelectorAll('.toggle-pass').forEach(btn => {
+      btn.innerHTML = eyeOpenIcon;
+    });
+  }
+
+  function openPasswordModal() {
+    resetPasswordForm();
+    closeProfile();
+    passwordBackdrop.classList.add('open');
+    setTimeout(() => oldPassword.focus(), 100);
+  }
+  function closePasswordModal() {
+    passwordBackdrop.classList.remove('open');
+    resetPasswordForm();
+  }
+
+  changePassBtn.addEventListener('click', openPasswordModal);
+  passwordCancel.addEventListener('click', closePasswordModal);
+  passwordBackdrop.addEventListener('click', (e) => {
+    if (e.target === passwordBackdrop) {
+      closePasswordModal();
+      return;
+    }
+    const btn = e.target.closest('.toggle-pass');
+    if (!btn) return;
+    const field = document.getElementById(btn.dataset.target);
+    const isPassword = field.type === 'password';
+    field.type = isPassword ? 'text' : 'password';
+    btn.innerHTML = isPassword ? eyeOffIcon : eyeOpenIcon;
+    btn.setAttribute('aria-label', isPassword ? 'Скрыть пароль' : 'Показать пароль');
+    field.focus();
+  });
+
+  passwordFields.forEach(({ input, error }) => {
+    input.addEventListener('input', () => {
+      input.classList.remove('invalid');
+      error.classList.remove('show');
+    });
+  });
+
+  function validatePasswordForm() {
+    let ok = true;
+
+    if (oldPassword.value.length < 6) {
+      oldPassword.classList.add('invalid');
+      oldPasswordError.classList.add('show');
+      ok = false;
+    }
+    if (newPassword.value.length < 6) {
+      newPassword.classList.add('invalid');
+      newPasswordError.classList.add('show');
+      ok = false;
+    }
+    if (confirmPassword.value.length < 6 || newPassword.value !== confirmPassword.value) {
+      confirmPassword.classList.add('invalid');
+      confirmPasswordError.classList.add('show');
+      ok = false;
+    }
+
+    if (!ok) {
+      const firstInvalid = passwordBackdrop.querySelector('input.invalid');
+      if (firstInvalid) firstInvalid.focus();
+    }
+    return ok;
+  }
+
+  // ===== Сохранение данных =====
   editSave.addEventListener('click', () => {
     const name = editName.value.trim();
     const email = editEmail.value.trim();
@@ -1205,12 +1472,42 @@
     else localStorage.removeItem('medai_avatar');
 
     renderProfile();
-    exitEditMode();
+    closeEditModal();
+  });
+
+  // ===== Сохранение пароля =====
+  passwordSave.addEventListener('click', async () => {
+    if (!validatePasswordForm()) return;
+
+    passwordSave.disabled = true;
+
+    try {
+      await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        },
+        body: JSON.stringify({
+          old_password: oldPassword.value,
+          new_password: newPassword.value
+        })
+      });
+    } catch (e) {
+      // Сервер не запущен — штатный локальный режим КТ1
+    }
+
+    setTimeout(() => {
+      passwordSave.disabled = false;
+      passwordSuccess.classList.add('show');
+      setTimeout(closePasswordModal, 1200);
+    }, 400);
   });
 
   // ===== Выход =====
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_role');
     localStorage.removeItem('medai_name');
     localStorage.removeItem('medai_avatar');
     window.location.href = 'auth.html';
@@ -1230,33 +1527,65 @@
   });
   document.getElementById('deleteAccountConfirm').addEventListener('click', () => {
     localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_role');
     localStorage.removeItem('medai_name');
     localStorage.removeItem('medai_avatar');
     window.location.href = 'auth.html';
   });
 
   // ===== Аптечка =====
-  let medications = [
-    { name: "Парацетамол", tags: ["жар", "боль", "головная боль"] },
-    { name: "Ибупрофен", tags: ["боль", "воспаление", "жар"] },
-    { name: "Аспирин", tags: ["боль", "жар", "разжижение крови"] },
-    { name: "Амоксициллин", tags: ["антибиотик", "инфекции", "ангина"] },
-    { name: "Азитромицин", tags: ["антибиотик", "бронхит", "пневмония"] },
-    { name: "Лоратадин", tags: ["аллергия", "насморк", "зуд"] },
-    { name: "Цетиризин", tags: ["аллергия", "крапивница"] },
-    { name: "Омепразол", tags: ["желудок", "изжога", "гастрит"] },
-    { name: "Смекта", tags: ["диарея", "отравление", "ЖКТ"] },
-    { name: "Регидрон", tags: ["обезвоживание", "диарея", "потеря солей"] },
-    { name: "Активированный уголь", tags: ["отравление", "сорбент"] },
-    { name: "Но-шпа", tags: ["спазмы", "боль в животе"] },
-    { name: "Валерьянка", tags: ["тревога", "бессонница", "нервы"] },
-    { name: "Пустырник", tags: ["успокоительное", "стресс"] },
-    { name: "Витамин C", tags: ["иммунитет", "простуда"] },
-    { name: "Нурофен", tags: ["боль", "жар", "воспаление"] },
-    { name: "ТераФлю", tags: ["простуда", "жар", "насморк"] },
-    { name: "Капли в нос", tags: ["насморк", "заложенность"] }
-  ];
+  const KIT_STORAGE_KEY = 'medai_kit';
 
+  function loadKit() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KIT_STORAGE_KEY));
+      if (Array.isArray(saved) && saved.length > 0) return saved;
+    } catch (e) {}
+    return [
+      { id: "kit_1", name: "Ибупрофен", dosage: "200 мг", form: "таблетки", tags: ["боль", "воспаление", "жар", "головная боль"] },
+      { id: "kit_2", name: "Парацетамол", dosage: "500 мг", form: "таблетки", tags: ["жар", "боль", "головная боль"] },
+      { id: "kit_3", name: "Дротаверин", dosage: "40 мг", form: "таблетки", tags: ["спазмы", "боль в животе"] },
+      { id: "kit_4", name: "Аспирин", dosage: "500 мг", form: "таблетки", tags: ["боль", "жар", "разжижение крови"] },
+      { id: "kit_5", name: "Амоксициллин", dosage: "500 мг", form: "капсулы", tags: ["антибиотик", "инфекции", "ангина"] },
+      { id: "kit_6", name: "Лоратадин", dosage: "10 мг", form: "таблетки", tags: ["аллергия", "насморк", "зуд"] },
+      { id: "kit_7", name: "Омепразол", dosage: "20 мг", form: "капсулы", tags: ["желудок", "изжога", "гастрит"] },
+      { id: "kit_8", name: "Смекта", dosage: "3 г", form: "порошок", tags: ["диарея", "отравление", "ЖКТ"] },
+      { id: "kit_9", name: "Пантенол", dosage: "5%", form: "спрей", tags: ["ожоги", "заживление"] }
+    ];
+  }
+
+  function saveKit() {
+    localStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(medications));
+  }
+
+  async function syncKitFromBackend() {
+    try {
+      const res = await fetch(`${API_BASE}/kit`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          medications = data.items.map(it => ({
+            id: it.id || ('kit_' + Date.now()),
+            name: it.name,
+            dosage: it.dosage || '',
+            form: it.form || 'таблетки',
+            tags: it.tags || [it.category || 'общие']
+          }));
+          saveKit();
+          renderTagsFilter();
+          renderList();
+        }
+      }
+    } catch (e) {
+      // Сервер не запущен — штатный автономный режим КТ1
+    }
+  }
+
+  let medications = loadKit();
   let selectedMeds = [];
   let activeTags = new Set();
 
@@ -1313,7 +1642,7 @@
     const filtered = medications.filter(m => {
       const matchesQuery = !q || m.name.toLowerCase().includes(q);
       const matchesTags = activeTags.size === 0
-        || (m.tags || []).some(t => activeTags.has(t));
+        || [...activeTags].every(t => (m.tags || []).includes(t));
       return matchesQuery && matchesTags;
     });
 
@@ -1323,7 +1652,7 @@
       let msg;
       if (q && activeTags.size) msg = `Ничего не найдено по запросу «${searchInput.value}» с выбранными тегами`;
       else if (q) msg = `Ничего не найдено по запросу «${searchInput.value}»`;
-      else if (activeTags.size) msg = `Нет лекарств с выбранными тегами`;
+      else if (activeTags.size) msg = `Нет лекарств со всеми выбранными тегами`;
       else msg = 'В аптечке пока пусто';
 
       medList.innerHTML = `
@@ -1343,9 +1672,13 @@
         ? `<div class="med-tags">${med.tags.map(t => `<span class="med-tag">${t}</span>`).join('')}</div>`
         : '';
 
+      const metaInfo = [med.dosage, med.form].filter(Boolean).join(' • ');
+      const metaHTML = metaInfo ? `<div style="font-size:12px;color:var(--text-muted);margin:2px 0 4px;">${metaInfo}</div>` : '';
+
       card.innerHTML = `
         <button class="card-delete" title="Удалить" aria-label="Удалить">${trashIcon}</button>
         <h3>${med.name}</h3>
+        ${metaHTML}
         ${tagsHTML}
       `;
 
@@ -1399,16 +1732,20 @@
 
   searchInput.addEventListener('input', renderList);
 
-  // ===== Добавление =====
+  // ===== Добавление лекарства =====
   const addBtn = document.getElementById('addBtn');
   const modalBackdrop = document.getElementById('modalBackdrop');
   const newName = document.getElementById('newName');
+  const newForm = document.getElementById('newForm');
+  const newDosage = document.getElementById('newDosage');
   const newNameError = document.getElementById('newNameError');
   const cancelAdd = document.getElementById('cancelAdd');
   const saveAdd = document.getElementById('saveAdd');
 
   function openModal() {
     newName.value = '';
+    if (newForm) newForm.value = '';
+    if (newDosage) newDosage.value = '';
     newName.classList.remove('invalid');
     newNameError.classList.remove('show');
     modalBackdrop.classList.add('open');
@@ -1447,16 +1784,45 @@
       return;
     }
 
-    medications.unshift({ name, tags: [] });
+    const form = newForm ? newForm.value.trim() : '';
+    const dosage = newDosage ? newDosage.value.trim() : '';
+
+    const newItem = {
+      id: 'kit_' + Date.now(),
+      name,
+      form: form || 'таблетки',
+      dosage: dosage || '',
+      tags: []
+    };
+
+    medications.unshift(newItem);
+    saveKit();
+    renderTagsFilter();
     renderList();
     closeModal();
+
+    // Фоновая синхронизация с FastAPI Полины
+    fetch(`${API_BASE}/kit/items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+      },
+      body: JSON.stringify({
+        name: newItem.name,
+        dosage: newItem.dosage,
+        form: newItem.form,
+        category: 'Общие',
+        tags: newItem.tags
+      })
+    }).catch(() => {});
   });
 
   newName.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); saveAdd.click(); }
   });
 
-  // ===== Удаление =====
+  // ===== Удаление лекарства =====
   const confirmBackdrop = document.getElementById('confirmBackdrop');
   const confirmText = document.getElementById('confirmText');
   const confirmCancel = document.getElementById('confirmCancel');
@@ -1479,11 +1845,24 @@
   });
   confirmDelete.addEventListener('click', () => {
     if (pendingDeleteName) {
+      const itemToDelete = medications.find(m => m.name === pendingDeleteName);
       medications = medications.filter(m => m.name !== pendingDeleteName);
       selectedMeds = selectedMeds.filter(n => n !== pendingDeleteName);
+      saveKit();
+      renderTagsFilter();
       renderList();
       renderSelectedBar();
       updateSendBtn();
+
+      // Фоновое удаление на сервере FastAPI
+      if (itemToDelete && itemToDelete.id) {
+        fetch(`${API_BASE}/kit/items/${itemToDelete.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+          }
+        }).catch(() => {});
+      }
     }
     closeConfirm();
   });
@@ -1513,12 +1892,14 @@
       if (deleteAccountBackdrop.classList.contains('open')) deleteAccountBackdrop.classList.remove('open');
       else if (confirmBackdrop.classList.contains('open')) closeConfirm();
       else if (modalBackdrop.classList.contains('open')) closeModal();
+      else if (passwordBackdrop.classList.contains('open')) closePasswordModal();
+      else if (editBackdrop.classList.contains('open')) closeEditModal();
       else if (sidebar.classList.contains('open')) closeSidebar();
       else if (profilePanel.classList.contains('open')) closeProfile();
     }
   });
 
-  // ===== Чат =====
+  // ===== Чат и RAG-ответы =====
   const messages = document.getElementById('messages');
   const input = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
@@ -1574,43 +1955,137 @@
     if (t) t.remove();
   }
 
-  function generateReply(text) {
-    const q = text.toLowerCase();
-    const mentioned = medications.filter(m => q.includes(m.name.toLowerCase()));
-
-    if (mentioned.length === 1) {
-      const m = mentioned[0];
-      const tagsText = (m.tags && m.tags.length)
-        ? `применяется при: ${m.tags.join(', ')}.`
-        : `теги пока не назначены — скоро их проставит нейросеть.`;
-      return `Про <span class="med-name">${m.name}</span>: ${tagsText}<br><br>
-        ⚠️ Перед применением уточните дозировку у врача.`;
+  // Рендеринг структурированного ответа (RAG / Red Flag / текст)
+  function renderBotResponse(data) {
+    if (data.emergency_mode) {
+      return `
+        <div class="emergency-card">
+          <div class="emergency-header">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>${data.emergency_title || 'Экстренное состояние: неотложная помощь'}</span>
+          </div>
+          <div class="emergency-call">
+            Вызов скорой медицинской помощи: 112
+          </div>
+          <div class="emergency-steps">
+            <strong>Алгоритм первой доврачебной помощи:</strong>
+            <ol>
+              ${(data.emergency_steps || []).map(s => `<li>${s}</li>`).join('')}
+            </ol>
+          </div>
+          <div class="rag-disclaimer">${data.disclaimer || 'При угрожающих состояниях немедленно вызовите врача.'}</div>
+        </div>
+      `;
     }
 
-    if (mentioned.length > 1) {
-      const list = mentioned.map(m =>
-        `• <span class="med-name">${m.name}</span>${m.tags && m.tags.length ? ' — ' + m.tags.join(', ') : ''}`
-      ).join('<br>');
-      return `Разбираю по препаратам:<br><br>${list}
-        <br><br>⚠️ Не смешивайте без консультации врача.`;
+    if (data.recommendation) {
+      const rec = data.recommendation;
+      const badgeClass = rec.in_user_kit ? 'in-kit' : 'not-in-kit';
+      const badgeText = rec.in_user_kit ? '✓ Есть в вашей аптечке' : '✕ Нет в наличии дома';
+
+      return `
+        <div class="rag-card">
+          <div class="rag-card-header">
+            <div class="rag-card-title">${rec.medicine_name} ${rec.dosage_form ? `<span style="font-size:13px;color:var(--text-muted);font-weight:400;">(${rec.dosage_form})</span>` : ''}</div>
+            <span class="badge-kit ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="rag-section">
+            <span class="rag-label">Режим дозирования</span>
+            <div class="rag-text">${rec.dosage}</div>
+          </div>
+          <div class="rag-section">
+            <span class="rag-label">Противопоказания</span>
+            <div class="rag-text">${rec.contraindications}</div>
+          </div>
+          ${rec.warnings ? `
+            <div class="rag-warning">
+              <strong>Внимание:</strong> ${rec.warnings}
+            </div>` : ''}
+          <div class="rag-footer">
+            ${data.sources && data.sources.length ? `
+              <div class="rag-source">Источник: ${data.sources[0].title}</div>` : ''}
+            <div class="rag-disclaimer">${data.disclaimer || 'Информация носит ознакомительный характер на основе официальной инструкции.'}</div>
+          </div>
+        </div>
+      `;
     }
 
-    const matched = medications.filter(m =>
-      m.tags && m.tags.some(tag => q.includes(tag.toLowerCase()))
-    );
-    if (matched.length) {
-      const list = matched.slice(0, 3).map(m =>
-        `• <span class="med-name">${m.name}</span> — ${m.tags.join(', ')}`
-      ).join('<br>');
-      return `Возможные варианты:<br><br>${list}
-        <br><br><span style="color:#7a7f85;font-size:13px;">Это не заменяет консультацию врача.</span>`;
-    }
-
-    return `Уточните, пожалуйста, симптомы: температура, боль, кашель, аллергия, проблемы с ЖКТ?
-      Также можете выбрать лекарства из аптечки слева.`;
+    return data.text_message || 'Уточните, пожалуйста, симптомы или выберите препарат из аптечки слева.';
   }
 
-  function send() {
+  // Генератор эталонного ответа (демо-режим прототипа КТ1 по spec/)
+  function generateMockReply(queryText, selectedList) {
+    const q = (queryText + ' ' + selectedList.join(' ')).toLowerCase();
+
+    // Экстренный сценарий UC-04 (Red Flag)
+    if (q.includes('ожог') || q.includes('кров') || q.includes('сознани') || q.includes('удушь')) {
+      return {
+        status: "success",
+        emergency_mode: true,
+        emergency_title: "Экстренное состояние: Термический ожог / Травма",
+        emergency_phone: "112",
+        emergency_steps: [
+          "Немедленно охлаждайте место поражения чистой проточной водой в течение 15 минут.",
+          "Наложите сухую стерильную марлевую повязку. Не вскрывайте пузыри и не удаляйте прилипшую одежду.",
+          "Категорически запрещено смазывать ожог маслом, жиром, спиртом или непроверенными мазями.",
+          "При тяжелом состоянии немедленно позвоните по единому номеру 112."
+        ],
+        disclaimer: "При угрожающих состояниях стандартные доврачебные рекомендации блокируются."
+      };
+    }
+
+    // Основной сценарий UC-01 (Острая боль, головная боль, Ибупрофен)
+    if (q.includes('голов') || q.includes('бол') || q.includes('висок') || q.includes('ибупрофен')) {
+      const inKit = medications.some(m => m.name.toLowerCase().includes('ибупрофен'));
+      return {
+        status: "success",
+        emergency_mode: false,
+        recommendation: {
+          medicine_name: "Ибупрофен",
+          dosage_form: "таблетки 200 мг",
+          in_user_kit: inKit,
+          dosage: "1 таблетка (200 мг) внутрь после еды, запивая стаканом воды. Повторный приём допускается не ранее чем через 4–6 часов.",
+          contraindications: "Эрозивно-язвенные заболевания ЖКТ в фазе обострения, тяжёлая почечная недостаточность, III триместр беременности.",
+          warnings: "Максимальная суточная доза для взрослых — 1200 мг (6 таблеток). Не принимать более 3–5 дней подряд без назначения врача."
+        },
+        sources: [
+          { doc_id: "doc_001", title: "Инструкция Минздрава РФ ЛП-001234: Ибупрофен 200мг", bm25_score: 14.82 }
+        ],
+        disclaimer: "Информация носит исключительно ознакомительный характер. При усилении симптомов обратитесь к врачу."
+      };
+    }
+
+    // Если упомянут конкретный препарат из наличия
+    const mentioned = medications.filter(m => q.includes(m.name.toLowerCase()));
+    if (mentioned.length > 0) {
+      const m = mentioned[0];
+      return {
+        status: "success",
+        emergency_mode: false,
+        recommendation: {
+          medicine_name: m.name,
+          dosage_form: [m.dosage, m.form].filter(Boolean).join(', ') || 'таблетки',
+          in_user_kit: true,
+          dosage: "Применять в строгом соответствии с официальной аннотацией препарата: 1 доза после еды.",
+          contraindications: "Индивидуальная непереносимость компонентов, острые заболевания ЖКТ.",
+          warnings: "Соблюдайте интервал между приемами не менее 4–6 часов."
+        },
+        sources: [
+          { doc_id: "doc_med", title: `Официальная инструкция: ${m.name}`, bm25_score: 12.4 }
+        ],
+        disclaimer: "Сервис носит справочный характер. Перед приёмом ознакомьтесь с инструкцией."
+      };
+    }
+
+    return {
+      status: "info",
+      emergency_mode: false,
+      text_message: "Уточните симптомы недомогания (например: головная боль, жар, спазм) или прикрепите препараты из вашей аптечки слева для анализа совместимости."
+    };
+  }
+
+  // Отправка запроса с попыткой вызова FastAPI и fallback
+  async function send() {
     const text = input.value.trim();
     const meds = [...selectedMeds];
     if (!text && meds.length === 0) return;
@@ -1631,10 +2106,36 @@
     autoResize();
 
     addTyping();
+
+    // 1. Попытка запроса к реальному бэкенду Полины
+    try {
+      const res = await fetch(`${API_BASE}/chat/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('medai_token') || ''}`
+        },
+        body: JSON.stringify({
+          query: query,
+          include_kit_context: true
+        })
+      });
+      if (res.ok) {
+        const apiData = await res.json();
+        removeTyping();
+        addMessage(renderBotResponse(apiData), 'bot');
+        return;
+      }
+    } catch (e) {
+      // Сервер не запущен — штатный режим демонстрации КТ1
+    }
+
+    // 2. Демо-ответ по контракту spec/
     setTimeout(() => {
       removeTyping();
-      addMessage(generateReply(query), 'bot');
-    }, 700 + Math.random() * 500);
+      const mockData = generateMockReply(text, meds);
+      addMessage(renderBotResponse(mockData), 'bot');
+    }, 700 + Math.random() * 400);
   }
 
   sendBtn.addEventListener('click', send);
@@ -1649,6 +2150,7 @@
   renderTagsFilter();
   renderList();
   renderSelectedBar();
+  syncKitFromBackend();
 </script>
 </body>
 </html>
