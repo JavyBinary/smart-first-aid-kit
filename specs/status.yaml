@@ -1,0 +1,17 @@
+specs:
+    - name: 001-project-scaffold
+      status: done
+    - name: 002-auth-rbac-system
+      status: done
+    - name: 003-kit-inventory-baseline
+      status: done
+    - name: 004-admin-corpus-management
+      status: done
+    - name: 005-seamless-fallback-layer
+      status: done
+    - name: 006-emergency-red-flags
+      status: done
+    - name: 007-admin-benchmark-inspector
+      status: done
+    - name: 008-sdd-foundation-reorganization
+      status: done
