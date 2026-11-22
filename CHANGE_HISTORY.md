@@ -4,6 +4,36 @@
 
 ---
 
+## [0.2.0-refactor] — 2026-11-22
+### Архитектурная реорганизация репозитория по стандарту SDD (Тимлид: Лука)
+
+#### Добавлено:
+- **Инфраструктура Spec-Driven Development (`.agents/skills/sdd/`):**
+  - `SKILL.md` — формализованный рабочий цикл `specify -> plan -> implement -> verify`.
+  - `.agents/skills/sdd/scripts/spec_status.py` — CLI-инструмент управления реестром `specs/status.yaml` с валидацией переходов (`create`, `update`, `delete`, `list`).
+  - `.agents/skills/sdd/references/` — стандартизированные шаблоны (`spec-template.md`, `specify.md`, `plan.md`, `implement.md`, `verify.md`, `status.md`).
+- **Централизованный реестр спецификаций (`specs/`):**
+  - `specs/status.yaml` — машиночитаемый реестр состояний всех задач.
+  - `specs/changes/` — каталог атомарных спецификаций изменений с триадой `spec.md`, `plan.md`, `verification.md` для этапов КТ1 и фундамента (изменения `001-project-scaffold` .. `008-sdd-foundation-reorganization`).
+- **Актуальный архитектурный каталог (`docs/`):**
+  - `docs/README.md` — навигационная карта системы.
+  - `docs/architecture.md` — компонентная структура, Data Flow, изоляция слоев команды и Seamless Fallback.
+  - `docs/bm25.md` — математический аппарат BM25, токенизация, лемматизация `pymorphy3` и структура инвертированного индекса.
+  - `docs/rag.md` — конвейер Context Injection и Pydantic JSON-схема ответа.
+  - `docs/benchmark.md` — метрики $MRR$ и $Recall@k$, требования к датасету 15+ вопросов (10 обычных + 5 ловушек).
+  - `docs/api.md` — контракты REST API FastAPI (`/auth`, `/kit`, `/chat`, `/admin`).
+  - `docs/roles.md` — роли User и Admin, матрица RBAC.
+  - `docs/ui.md` — дизайн-система Каты, цветовые токены и сценарии экранов.
+- **Единый фасад команд (`Makefile`):**
+  - Команды `make help`, `make run-ui`, `make run-backend`, `make test`, `make bench`, `make lint`, `make format`, `make spec-list`.
+
+#### Изменено:
+- **`README.md`:** обновлен до современного паспорта проекта со структурой каталогов и командами `Makefile`.
+- **`AGENTS.md` & `GEMINI.md`:** синхронизированы с конвейером `.agents/skills/sdd/`, зафиксировано разделение зон ответственности команды и ведение доработок интерфейса Каты в отдельной ветке.
+- **Удален устаревший монолитный каталог `spec/`:** все требования перенесены в живой каталог `docs/` и атомарные спецификации `specs/changes/`.
+
+---
+
 ## [0.1.0-kt1] — 2026-10-05
 ### Контрольная Точка 1: Архитектурные спецификации SDD и прототип интерфейса
 
