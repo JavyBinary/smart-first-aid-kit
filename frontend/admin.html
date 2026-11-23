@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аптечка — Панель администратора MedAI</title>
+  <link rel="stylesheet" href="./src/styles/tokens.css">
+  <link rel="stylesheet" href="./src/styles/animations.css">
+  <link rel="stylesheet" href="./src/styles/layout.css">
+  <style>
+    body {
+      background: var(--bg-body);
+      overflow-y: auto;
+      min-height: 100vh;
+    }
+
+    .admin-layout {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 36px 24px 60px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .admin-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .admin-badge {
+      background: var(--brand-dark);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+    }
+
+    /* Статистические плашки */
+    .admin-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-val {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--brand-dark);
+      line-height: 1.1;
+    }
+
+    .stat-lbl {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Главные вкладки панели администратора */
+    .admin-tabs-nav {
+      display: flex;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 6px;
+      gap: 6px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .admin-tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .admin-tab-btn.active {
+      background: var(--brand-light);
+      color: var(--brand-dark);
+      font-weight: 700;
+      box-shadow: var(--shadow-xs);
+    }
+
+    /* Контейнер таблиц */
+    .admin-table-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .admin-table-toolbar {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: #FAFBFD;
+    }
+
+    .admin-search-input {
+      flex: 1;
+      max-width: 360px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+      font-size: 13.5px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .admin-search-input:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(0, 176, 116, 0.15);
+    }
+
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .admin-table th {
+      background: #F8FAFC;
+      padding: 12px 18px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .admin-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--divider);
+      font-size: 13.5px;
+      vertical-align: middle;
+    }
+
+    .admin-table tr:hover {
+      background: #F9FBFA;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .action-btn.edit {
+      background: #E8F0FE;
+      color: #1A73E8;
+    }
+    .action-btn.edit:hover { background: #D2E3FC; }
+
+    .action-btn.del {
+      background: #FFF0F0;
+      color: #D32F2F;
+    }
+    .action-btn.del:hover { background: #FDE2E2; }
+
+    .role-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .role-badge.admin { background: #F5EEF8; color: #7B1FA2; }
+    .role-badge.user { background: #E8F7F0; color: #00875A; }
+  </style>
+</head>
+<body>
+  <div class="top-festive-shimmer"></div>
+
+  <!-- Новогодняя гирлянда с провисающими дугами -->
+  <div class="festive-garland-wrap">
+    <svg class="garland-svg-cord" viewBox="0 0 1200 24" preserveAspectRatio="none">
+      <path d="M 0,2 Q 37.5,14 75,2 Q 112.5,14 150,2 Q 187.5,14 225,2 Q 262.5,14 300,2 Q 337.5,14 375,2 Q 412.5,14 450,2 Q 487.5,14 525,2 Q 562.5,14 600,2 Q 637.5,14 675,2 Q 712.5,14 750,2 Q 787.5,14 825,2 Q 862.5,14 900,2 Q 937.5,14 975,2 Q 1012.5,14 1050,2 Q 1087.5,14 1125,2 Q 1162.5,14 1200,2" fill="none" stroke="rgba(30, 60, 45, 0.35)" stroke-width="1.5"/>
+    </svg>
+    <div class="garland-bulbs-container" id="garlandBulbs"></div>
+  </div>
+
+  <canvas id="ambientCanvas"></canvas>
+
+  <div class="admin-layout">
+    <!-- Шапка панели -->
+    <header class="admin-header">
+      <div class="admin-brand">
+        <div class="brand-icon-box">
+          <svg class="brand-winter-hat" viewBox="0 0 60 60" fill="none">
+            <path d="M8 42 C 16 12, 40 14, 52 24 C 42 38, 36 42, 32 44 Z" fill="#E53935"/>
+            <circle cx="53" cy="24" r="7.5" fill="#FFFFFF"/>
+            <path d="M4 39 C 4 36, 7 34, 11 34 L 38 38 C 42 38, 45 41, 45 44 C 45 47, 42 50, 38 50 L 11 46 C 7 46, 4 43, 4 39 Z" fill="#FFFFFF"/>
+          </svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+            <path d="M12 2v20M2 12h20"/>
+          </svg>
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h1 style="font-size: 22px; font-weight: 800; color: var(--brand-dark);">Панель администратора</h1>
+            <svg class="brand-christmas-tree" style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none">
+              <polygon points="12,2 5,14 8,14 3,21 21,21 16,14 19,14" fill="#00A86B"/>
+              <circle cx="12" cy="7" r="1.4" fill="#FFB300"/>
+              <circle cx="8" cy="13" r="1.4" fill="#FF3B30"/>
+              <circle cx="16" cy="13" r="1.4" fill="#4EA8DE"/>
+              <circle cx="12" cy="18" r="1.4" fill="#FFD54F"/>
+              <rect x="10.5" y="21" width="3" height="3" fill="#8D6E63"/>
+            </svg>
+            <span class="admin-badge">Admin Root</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Управление витриной лекарств, пользователями и качеством RAG-поиска</p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <a href="index.html" class="modal-btn-cancel" style="text-decoration: none; display: flex; align-items: center; gap: 6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>В приложение</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Сводная статистика -->
+    <div class="admin-stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="totalMedsStat">16</div>
+        <div class="stat-lbl">Лекарств в каталоге</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="totalUsersStat">4</div>
+        <div class="stat-lbl">Пользователей системы</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">1 420</div>
+        <div class="stat-lbl">Инструкций Минздрава</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color: #00B074;">0.94</div>
+        <div class="stat-lbl">MRR поискового ядра BM25</div>
+      </div>
+    </div>
+
+    <!-- Вкладки управления -->
+    <div class="admin-tabs-nav">
+      <button class="admin-tab-btn active" id="tabAdminCatalog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <span>Витрина аптеки (Каталог товаров)</span>
+      </button>
+      <button class="admin-tab-btn" id="tabAdminUsers">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Пользователи сервиса</span>
+      </button>
+      <button class="admin-tab-btn" id="tabAdminRAG">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>База Минздрава РФ и RAG-инспектор</span>
+      </button>
+    </div>
+
+    <!-- 1. Вкладка: Каталог товаров -->
+    <div id="adminCatalogSection" class="admin-table-card">
+      <div class="admin-table-toolbar">
+        <input type="text" id="adminCatalogSearch" class="admin-search-input" placeholder="Поиск лекарства в каталоге...">
+        <button class="modal-btn-save tap-effect" id="openAddMedicineModalBtn" style="padding: 9px 18px; font-size: 13.5px;">
+          + Добавить препарат в витрину
+        </button>
+      </div>
+
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Препарат</th>
+            <th>Категория</th>
+            <th>Форма и дозировка</th>
+            <th>Статус</th>
+            <th>Срок годности</th>
+            <th style="text-align: right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="adminCatalogTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 2. Вкладка: Пользователи -->
+    <div id="adminUsersSection" class="admin-table-card" style="display: none;">
+      <div class="admin-table-toolbar">
+        <input type="text" class="admin-search-input" placeholder="Поиск пользователя по имени или email...">
+      </div>
+
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Пользователь</th>
+            <th>Email</th>
+            <th>Роль</th>
+            <th>Медкарта</th>
+            <th>В аптечке</th>
+            <th style="text-align: right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="adminUsersTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 3. Вкладка: База Минздрава и RAG -->
+    <div id="adminRAGSection" class="admin-table-card" style="display: none;">
+      <div class="admin-table-toolbar">
+        <div style="font-size: 14px; font-weight: 700; color: var(--brand-dark);">
+          Официальный реестр лекарственных средств Минздрава РФ (ЛП-001234)
+        </div>
+      </div>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>МНН / Препарат</th>
+            <th>Фармгруппа</th>
+            <th>Показания к применению</th>
+            <th>Противопоказания</th>
+            <th>BM25 Recall@k</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Ибупрофен</strong><br/><span style="font-size: 12px; color: var(--text-muted);">Ibuprofen</span></td>
+            <td>НПВП, анальгетик</td>
+            <td>Болевой синдром, лихорадочные состояния, воспалительные процессы</td>
+            <td>Эрозивно-язвенные поражения ЖКТ, тяжелая почечная недостаточность</td>
+            <td><strong style="color: #00B074;">Recall@1 = 96.2%</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Парацетамол</strong><br/><span style="font-size: 12px; color: var(--text-muted);">Paracetamol</span></td>
+            <td>Анальгетик-антипиретик</td>
+            <td>Жар, головная боль, зубная боль, ОРВИ</td>
+            <td>Тяжелые нарушения функции печени, алкоголизм</td>
+            <td><strong style="color: #00B074;">Recall@1 = 98.4%</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Нимесулид (Нимесил)</strong><br/><span style="font-size: 12px; color: var(--text-muted);">Nimesulide</span></td>
+            <td>Селективный ЦОГ-2 НПВП</td>
+            <td>Острая боль, бурсит, тендинит, артралгии</td>
+            <td>Язва желудка, беременность, гепатотоксические реакции</td>
+            <td><strong style="color: #00B074;">Recall@1 = 94.0%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Модальное окно создания / редактирования препарата -->
+  <div id="medicineModalOverlay" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div style="font-size: 17px; font-weight: 700; color: var(--brand-dark);" id="medModalTitle">Добавить препарат в витрину</div>
+        <button class="modal-close-btn" id="closeMedModalBtn">&times;</button>
+      </div>
+
+      <form id="medicineModalForm" style="display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="editMedId">
+
+        <div>
+          <label class="modal-label">Торговое наименование</label>
+          <input type="text" id="medFormName" class="modal-input" required placeholder="Например: Нурофен Форте">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label class="modal-label">Категория</label>
+            <select id="medFormCategory" class="modal-input" required>
+              <option value="Обезболивающие">Обезболивающие</option>
+              <option value="Простуда и грипп">Простуда и грипп</option>
+              <option value="ЖКТ и пищеварение">ЖКТ и пищеварение</option>
+              <option value="Спазмолитики">Спазмолитики</option>
+              <option value="Аллергия">Аллергия</option>
+              <option value="Антисептики">Антисептики</option>
+            </select>
+          </div>
+          <div>
+            <label class="modal-label">Форма выпуска</label>
+            <input type="text" id="medFormForm" class="modal-input" required placeholder="таблетки / капсулы / спрей">
+          </div>
+        </div>
+
+        <div>
+          <label class="modal-label">Дозировка и фасовка</label>
+          <input type="text" id="medFormDosage" class="modal-input" required placeholder="например: 400 мг · 20 шт.">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label class="modal-label">Отпуск из аптек</label>
+            <select id="medFormStatus" class="modal-input">
+              <option value="otc">Без рецепта (OTC)</option>
+              <option value="rx">По рецепту врача (Rx)</option>
+            </select>
+          </div>
+          <div>
+            <label class="modal-label">Срок годности</label>
+            <input type="date" id="medFormExpiry" class="modal-input" value="2027-12-31">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button type="button" class="modal-btn-cancel" id="cancelMedModalBtn" style="flex: 1;">Отмена</button>
+          <button type="submit" class="modal-btn-save" style="flex: 1.4;">Сохранить препарат</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { AmbientBackground } from './src/components/AmbientBackground.js';
+    import { CATALOG_DATABASE } from './src/components/Catalog.js';
+
+    // 1. Зимний фон и гирлянда
+    const canvas = document.getElementById('ambientCanvas');
+    if (canvas) new AmbientBackground(canvas);
+
+    const garlandBulbs = document.getElementById('garlandBulbs');
+    if (garlandBulbs) {
+      const colors = ['#FF3B30', '#FFB300', '#00B074', '#4EA8DE', '#AF52DE', '#FF9500'];
+      for (let i = 0; i < 32; i++) {
+        const node = document.createElement('div');
+        node.className = 'garland-bulb-node';
+        const col = colors[i % colors.length];
+        node.innerHTML = `
+          <div class="garland-bulb-socket"></div>
+          <div class="garland-bulb-lamp" style="background: ${col}; color: ${col}; animation-delay: ${(i * 0.12) % 1.8}s;"></div>
+        `;
+        garlandBulbs.appendChild(node);
+      }
+    }
+
+    // 2. Каталог лекарств в хранилище
+    let catalog = [...CATALOG_DATABASE];
+
+    // Пользователи системы
+    let users = [
+      { id: 'u1', name: 'Лука (Вы)', email: 'lukich@gmail.com', role: 'admin', medcard: 'Заполнена', kitCount: 11 },
+      { id: 'u2', name: 'Полина', email: 'polina@medai.ru', role: 'admin', medcard: 'Частично', kitCount: 5 },
+      { id: 'u3', name: 'Катя', email: 'katya@medai.ru', role: 'user', medcard: 'Заполнена', kitCount: 6 }
+    ];
+
+    // Навигация по вкладкам админки
+    const tabCatalog = document.getElementById('tabAdminCatalog');
+    const tabUsers = document.getElementById('tabAdminUsers');
+    const tabRAG = document.getElementById('tabAdminRAG');
+
+    const secCatalog = document.getElementById('adminCatalogSection');
+    const secUsers = document.getElementById('adminUsersSection');
+    const secRAG = document.getElementById('adminRAGSection');
+
+    function switchAdminTab(target) {
+      tabCatalog.classList.toggle('active', target === 'catalog');
+      tabUsers.classList.toggle('active', target === 'users');
+      tabRAG.classList.toggle('active', target === 'rag');
+
+      secCatalog.style.display = target === 'catalog' ? 'block' : 'none';
+      secUsers.style.display = target === 'users' ? 'block' : 'none';
+      secRAG.style.display = target === 'rag' ? 'block' : 'none';
+    }
+
+    tabCatalog.addEventListener('click', () => switchAdminTab('catalog'));
+    tabUsers.addEventListener('click', () => switchAdminTab('users'));
+    tabRAG.addEventListener('click', () => switchAdminTab('rag'));
+
+    // Рендеринг таблицы каталога
+    function renderCatalogTable() {
+      const tbody = document.getElementById('adminCatalogTableBody');
+      const search = (document.getElementById('adminCatalogSearch').value || '').toLowerCase();
+      document.getElementById('totalMedsStat').textContent = catalog.length;
+
+      const filtered = catalog.filter(m => 
+        m.name.toLowerCase().includes(search) || 
+        m.category.toLowerCase().includes(search)
+      );
+
+      tbody.innerHTML = filtered.map(m => `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td><span class="cell-category">${m.category}</span></td>
+          <td>${m.dosage}</td>
+          <td>
+            <span class="role-badge ${m.status === 'otc' ? 'user' : 'admin'}">
+              ${m.status === 'otc' ? 'Без рецепта' : 'По рецепту'}
+            </span>
+          </td>
+          <td>${m.expiry || '2027-12-31'}</td>
+          <td style="text-align: right;">
+            <button class="action-btn edit tap-effect edit-med-btn" data-id="${m.id}">Правка</button>
+            <button class="action-btn del tap-effect del-med-btn" data-id="${m.id}">Удалить</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.del-med-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          if (confirm('Удалить препарат из каталога?')) {
+            catalog = catalog.filter(m => m.id !== b.dataset.id);
+            renderCatalogTable();
+          }
+        });
+      });
+
+      tbody.querySelectorAll('.edit-med-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          const med = catalog.find(m => m.id === b.dataset.id);
+          if (med) openMedModal(med);
+        });
+      });
+    }
+
+    // Рендеринг пользователей
+    function renderUsersTable() {
+      const tbody = document.getElementById('adminUsersTableBody');
+      document.getElementById('totalUsersStat').textContent = users.length;
+
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td><strong>${u.name}</strong></td>
+          <td>${u.email}</td>
+          <td><span class="role-badge ${u.role}">${u.role}</span></td>
+          <td>${u.medcard}</td>
+          <td>${u.kitCount} шт.</td>
+          <td style="text-align: right;">
+            <button class="action-btn edit tap-effect toggle-role-btn" data-id="${u.id}">
+              ${u.role === 'admin' ? 'Сделать пользователем' : 'Сделать админом'}
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.toggle-role-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          const u = users.find(x => x.id === b.dataset.id);
+          if (u) {
+            u.role = u.role === 'admin' ? 'user' : 'admin';
+            renderUsersTable();
+          }
+        });
+      });
+    }
+
+    // Модальное окно добавления / правки лекарства
+    const medModal = document.getElementById('medicineModalOverlay');
+    const openAddMedBtn = document.getElementById('openAddMedicineModalBtn');
+    const closeMedModalBtn = document.getElementById('closeMedModalBtn');
+    const cancelMedModalBtn = document.getElementById('cancelMedModalBtn');
+    const medForm = document.getElementById('medicineModalForm');
+
+    function openMedModal(med = null) {
+      document.getElementById('editMedId').value = med ? med.id : '';
+      document.getElementById('medModalTitle').textContent = med ? 'Редактировать препарат' : 'Добавить препарат в витрину';
+      document.getElementById('medFormName').value = med ? med.name : '';
+      document.getElementById('medFormCategory').value = med ? med.category : 'Обезболивающие';
+      document.getElementById('medFormForm').value = med ? med.form : 'таблетки';
+      document.getElementById('medFormDosage').value = med ? med.dosage : '';
+      document.getElementById('medFormStatus').value = med ? med.status : 'otc';
+      document.getElementById('medFormExpiry').value = med ? med.expiry : '2027-12-31';
+
+      medModal.style.display = 'flex';
+    }
+
+    openAddMedBtn.addEventListener('click', () => openMedModal(null));
+    closeMedModalBtn.addEventListener('click', () => medModal.style.display = 'none');
+    cancelMedModalBtn.addEventListener('click', () => medModal.style.display = 'none');
+
+    medForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('editMedId').value;
+      const name = document.getElementById('medFormName').value.trim();
+      const category = document.getElementById('medFormCategory').value;
+      const form = document.getElementById('medFormForm').value.trim();
+      const dosage = document.getElementById('medFormDosage').value.trim();
+      const status = document.getElementById('medFormStatus').value;
+      const expiry = document.getElementById('medFormExpiry').value;
+
+      if (editId) {
+        const item = catalog.find(m => m.id === editId);
+        if (item) {
+          Object.assign(item, { name, category, form, dosage, status, expiry });
+        }
+      } else {
+        catalog.unshift({
+          id: `med_${Date.now()}`,
+          name,
+          category,
+          form,
+          dosage,
+          status,
+          expiry,
+          tags: [category.toLowerCase()],
+          iconColor: status === 'otc' ? '#E8F7F0' : '#FFF3E8'
+        });
+      }
+
+      medModal.style.display = 'none';
+      renderCatalogTable();
+    });
+
+    document.getElementById('adminCatalogSearch').addEventListener('input', renderCatalogTable);
+
+    renderCatalogTable();
+    renderUsersTable();
+  </script>
+</body>
+</html>

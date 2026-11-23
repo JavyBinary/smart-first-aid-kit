@@ -15,3 +15,17 @@ specs:
       status: done
     - name: 008-sdd-foundation-reorganization
       status: done
+    - name: 009-ui-frontend-scaffold
+      status: done
+    - name: 010-ui-ambient-dynamics
+      status: done
+    - name: 011-ui-medicine-catalog
+      status: done
+    - name: 012-ui-multichat-layout
+      status: done
+    - name: 013-ui-mascot-assistant
+      status: done
+    - name: 014-ui-health-profile-allergies
+      status: done
+    - name: 015-ui-custom-medicine-addition
+      status: done

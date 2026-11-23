@@ -1,0 +1,69 @@
+/* ===== Дизайн-система Аптечки (Сбер Еаптека + Яндекс Лавка) ===== */
+
+:root {
+  /* Основная брендовая палитра */
+  --brand: #00B074;
+  --brand-hover: #009663;
+  --brand-active: #007D53;
+  --brand-light: #E8F7F0;
+  --brand-lightest: #F2FBF7;
+  --brand-dark: #0A3B32;
+  --brand-gradient: linear-gradient(135deg, #00B074 0%, #00C887 100%);
+  --brand-gradient-glow: linear-gradient(135deg, rgba(0, 176, 116, 0.25) 0%, rgba(0, 200, 135, 0.1) 100%);
+
+  /* Фоновые слои (светлая тема) */
+  --bg-body: #F4F6F9;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F8FAFC;
+  --bg-overlay: rgba(10, 25, 20, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.7);
+
+  /* Текст и типографика */
+  --text-main: #181C20;
+  --text-secondary: #48525E;
+  --text-muted: #828E9B;
+  --text-light: #FFFFFF;
+
+  /* Границы и разделители */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-focus: #00B074;
+  --divider: #ECEEF2;
+
+  /* Медицинские и фармацевтические статусы */
+  --badge-otc-bg: #E8F7F0;
+  --badge-otc-text: #00875A;
+  --badge-rx-bg: #FFF3E6;
+  --badge-rx-text: #D97008;
+
+  /* Экстренный статус (Red Flags / 112) */
+  --danger: #FF3B30;
+  --danger-hover: #E02E24;
+  --danger-light: #FFF0F0;
+  --danger-border: rgba(255, 59, 48, 0.2);
+
+  /* Праздничные зимние акценты */
+  --winter-gold: #FFB300;
+  --winter-ice: #E1F2FB;
+  --winter-shimmer: linear-gradient(90deg, #00B074, #00D68F, #4EA8DE, #00B074);
+
+  /* Радиусы скругления */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  --radius-full: 9999px;
+
+  /* Мягкие естественные тени */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-brand: 0 8px 24px rgba(0, 176, 116, 0.28);
+  --shadow-flying: 0 12px 28px rgba(0, 176, 116, 0.35);
+
+  /* Шрифты */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}

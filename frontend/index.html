@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аптечка — Умный сервис</title>
+  <link rel="stylesheet" href="./src/styles/tokens.css">
+  <link rel="stylesheet" href="./src/styles/animations.css">
+  <link rel="stylesheet" href="./src/styles/layout.css">
+  <link rel="stylesheet" href="./src/styles/catalog.css">
+  <link rel="stylesheet" href="./src/styles/chat.css">
+  <link rel="stylesheet" href="./src/styles/kit.css">
+  <link rel="stylesheet" href="./src/styles/mascot.css">
+</head>
+<body>
+  <!-- Зимняя праздничная полоска перелива -->
+  <div class="top-festive-shimmer"></div>
+
+  <!-- Новогодняя гирлянда с провисающими дугами-фестонами -->
+  <div class="festive-garland-wrap">
+    <svg class="garland-svg-cord" viewBox="0 0 1200 24" preserveAspectRatio="none">
+      <path d="M 0,2 Q 37.5,14 75,2 Q 112.5,14 150,2 Q 187.5,14 225,2 Q 262.5,14 300,2 Q 337.5,14 375,2 Q 412.5,14 450,2 Q 487.5,14 525,2 Q 562.5,14 600,2 Q 637.5,14 675,2 Q 712.5,14 750,2 Q 787.5,14 825,2 Q 862.5,14 900,2 Q 937.5,14 975,2 Q 1012.5,14 1050,2 Q 1087.5,14 1125,2 Q 1162.5,14 1200,2" fill="none" stroke="rgba(30, 60, 45, 0.35)" stroke-width="1.5"/>
+    </svg>
+    <div class="garland-bulbs-container" id="garlandBulbs"></div>
+  </div>
+
+  <!-- Атмосферный Canvas живого зимнего фона (частицы, снежинки, глубина) -->
+  <canvas id="ambientCanvas"></canvas>
+
+  <div class="app-container" id="appContainer">
+    <!-- 1. Левая колонка: бренд, мультичат, профиль -->
+    <aside class="left-rail" id="leftRail">
+      <div class="rail-brand">
+        <div class="brand-icon-box">
+          <!-- Зимняя пушистая шапочка на логотипе -->
+          <svg class="brand-winter-hat" viewBox="0 0 60 60" fill="none">
+            <path d="M8 42 C 16 12, 40 14, 52 24 C 42 38, 36 42, 32 44 Z" fill="#E53935"/>
+            <circle cx="53" cy="24" r="7.5" fill="#FFFFFF"/>
+            <path d="M4 39 C 4 36, 7 34, 11 34 L 38 38 C 42 38, 45 41, 45 44 C 45 47, 42 50, 38 50 L 11 46 C 7 46, 4 43, 4 39 Z" fill="#FFFFFF"/>
+          </svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+            <path d="M12 2v20M2 12h20"/>
+          </svg>
+        </div>
+
+        <div class="brand-title-wrap">
+          <h1>Аптечка</h1>
+        </div>
+
+        <!-- Миниатюрная новогодняя елочка с огоньками -->
+        <div class="brand-tree-box" id="brandTreeTrigger" title="Нажми, чтобы позвать пилюлю на прогулку!">
+          <svg class="brand-christmas-tree" viewBox="0 0 24 24" fill="none">
+            <polygon points="12,2 5,14 8,14 3,21 21,21 16,14 19,14" fill="#00A86B"/>
+            <circle cx="12" cy="7" r="1.4" fill="#FFB300"/>
+            <circle cx="8" cy="13" r="1.4" fill="#FF3B30"/>
+            <circle cx="16" cy="13" r="1.4" fill="#4EA8DE"/>
+            <circle cx="12" cy="18" r="1.4" fill="#FFD54F"/>
+            <rect x="10.5" y="21" width="3" height="3" fill="#8D6E63"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Кнопка «+ Новый диалог» -->
+      <button class="new-chat-btn tap-effect" id="newChatBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Новый диалог</span>
+      </button>
+
+      <!-- Список сохраненных консультаций -->
+      <div class="chat-sessions-list" id="chatSessionsList"></div>
+
+      <!-- Кнопка перехода в консоль администратора -->
+      <a href="./admin.html" class="admin-quick-switch-btn tap-effect" id="adminQuickSwitchBtn" title="Панель администратора">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+        <span>Панель администратора</span>
+      </a>
+
+      <!-- Профиль пользователя внизу -->
+      <div class="rail-footer-profile">
+        <div class="user-badge" id="userProfileBadge" title="Управление аккаунтом">
+          <div class="user-avatar-circle">Л</div>
+          <div>
+            <div class="user-meta-name">Лука</div>
+            <div class="user-meta-status">Личный профиль</div>
+          </div>
+        </div>
+        <button class="profile-settings-btn" id="profileSettingsBtn" title="Настройки аккаунта">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 2. Центральная рабочая зона -->
+    <main class="center-workzone">
+      <!-- Симметричный Gemini-style Header -->
+      <header class="center-top-bar">
+        <div class="center-top-bar-left">
+          <button class="sidebar-toggle-btn tap-effect" id="toggleLeftRailBtn" title="Свернуть / развернуть меню диалогов">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="tab-switcher">
+          <button class="tab-switch-btn active" id="tabChatBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Умная консультация</span>
+          </button>
+          <button class="tab-switch-btn" id="tabCatalogBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span>Аптека</span>
+          </button>
+        </div>
+
+        <div class="center-top-bar-right">
+          <button class="sidebar-toggle-btn tap-effect" id="toggleRightRailBtn" title="Свернуть / развернуть боковую панель аптечки">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="15" y1="3" x2="15" y2="21"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Контентные области: 100% ширина -->
+      <div class="center-content-panel">
+        <div id="chatViewMount" style="display: flex; width: 100%; height: 100%;"></div>
+        <div id="catalogViewMount" style="display: none; width: 100%; height: 100%; flex-direction: column;"></div>
+      </div>
+    </main>
+
+    <!-- 3. Правая колонка: домашняя аптечка & медкарта -->
+    <aside class="right-kit-column" id="kitColumnMount"></aside>
+  </div>
+
+  <!-- Общий оверлей модальных окон с правильным классом -->
+  <div id="modalOverlay" class="modal-overlay"></div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
