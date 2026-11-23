@@ -286,6 +286,8 @@ html, body {
   position: relative;
   flex-shrink: 0;
   overflow: visible;
+  cursor: default;
+  user-select: none;
 }
 
 /* Праздничная шапочка на логотипе: не срезается краем */
@@ -493,19 +495,32 @@ html, body {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  gap: 4px;
 }
 
 .user-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
   transition: background 0.15s;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 .user-badge:hover {
   background: rgba(0, 0, 0, 0.03);
+}
+
+.user-badge-info {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .user-avatar-circle {
@@ -529,12 +544,27 @@ html, body {
   font-weight: 600;
   color: var(--text-main);
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 105px;
 }
 
 .user-meta-status {
   font-size: 11px;
   color: var(--brand);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 105px;
+}
+
+.rail-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .profile-settings-btn {
