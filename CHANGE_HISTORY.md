@@ -4,6 +4,35 @@
 
 ---
 
+## [0.4.0-kt2-stage-5] — 2026-11-24
+### История диалогов, брокер событий и потоковая передача SSE (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено:
+- **Шина потоковых событий и контракты (`backend/src/medai/dialogs/events.py`, `event_broker.py`):**
+  - Описаны типы событий `DialogEventType` (`message_start`, `message_delta`, `message_end`, `message_error`) и строгая Pydantic v2 модель `DialogEvent`.
+  - Реализован внутрипроцессный брокер событий `InMemoryDialogEventBroker` с индивидуальными очередями подписчиков емкостью 64 события и автоматическим отсечением зависших клиентов для предотвращения backpressure.
+- **Хранилище истории диалогов (`backend/src/medai/dialogs/history.py`, `postgres.py`):**
+  - Описаны модели `DialogSummary`, `DialogMessage`, `DialogTranscript` и алгоритм автоматической генерации названий `make_title` (схлопывание пробелов, усечение до 80 символов с `…`).
+  - Реализован `PostgresHistoryStore` на SQLAlchemy 2.0 Core для таблиц `dialogs` и `messages` с атомарной фиксацией обмена сообщениями и строгим контролем владения по `user_id`.
+  - Реализован легковесный `InMemoryHistoryStore` для изолированного модульного тестирования.
+- **Сервисный слой диалогов и RAG-синтез (`backend/src/medai/dialogs/service.py`):**
+  - Класс `DialogService` с упорядоченной цепочкой фоновых задач `asyncio.Task` для предотвращения гонок состояний при параллельных запросах в один диалог.
+  - Встроенный триаж неотложных жизнеугрожающих состояний (Red Flags: термические ожоги, артериальное кровотечение, потеря сознания, судороги, удушье) с мгновенной активацией `emergency_mode` и выдачей доврачебных протоколов первой помощи 112/103.
+  - Интеграция с резидентным поисковым индексом `InMemoryBm25Index` для формирования клинических рекомендаций, дозировок, противопоказаний и медицинского дисклеймера.
+  - Потоковая фрагментация текстовых дельт (`message_delta`) и финализация (`message_end`).
+- **REST API и SSE роутер (`backend/src/medai/dialogs/router.py`):**
+  - Эндпоинты управления диалогами: `POST /api/v1/dialogs` (`201 Created` с заголовком `Location`), `GET /api/v1/dialogs`, `GET /api/v1/dialogs/{id}/messages`, `DELETE /api/v1/dialogs/{id}` (`204 No Content`).
+  - Асинхронная постановка сообщений: `POST /api/v1/dialogs/{id}/messages` (`202 Accepted`).
+  - Потоковый Server-Sent Events эндпоинт: `GET /api/v1/dialogs/{id}/events` (`text/event-stream`, события `ready`, `message_start`, `message_delta`, `message_end`, keep-alive пинги).
+  - Синхронный фасад `POST /api/v1/chat/query` для обратной совместимости с существующим фронтендом.
+- **Архитектурная документация:**
+  - Создан документ [docs/dialogs.md](docs/dialogs.md) со схемой компонентов, диаграммой sequence и спецификацией SSE.
+- **Верификация:**
+  - 43 теста в `make test` пройдены успешно (100% pass rate).
+  - Линтер `make lint` подтверждает соответствие стандартам Ruff.
+
+---
+
 ## [0.4.0-kt2-stage-4] — 2026-11-24
 ### Поисковое ядро BM25, морфологический анализ, корпус ГРЛС и бенчмарк (Ветка: feat/kt2-backend-rag)
 

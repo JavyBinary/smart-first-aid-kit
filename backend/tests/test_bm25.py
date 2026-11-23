@@ -157,7 +157,9 @@ def test_in_memory_bm25_index():
 
 
 def test_load_package_from_yaml():
-    pkg_path = Path(__file__).resolve().parents[2] / "data" / "medicines" / "package.yaml"
+    pkg_path = (
+        Path(__file__).resolve().parents[2] / "data" / "medicines" / "package.yaml"
+    )
     assert pkg_path.exists()
 
     analyzer = MorphAnalyzer()

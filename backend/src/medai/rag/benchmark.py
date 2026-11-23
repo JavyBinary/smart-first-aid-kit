@@ -118,9 +118,21 @@ class BenchmarkRunner:
                         rr = 1.0 / rank_idx
                         break
 
-                r_at_1 = len(relevant & set(retrieved[:1])) / len(relevant) if relevant else 0.0
-                r_at_3 = len(relevant & set(retrieved[:3])) / len(relevant) if relevant else 0.0
-                r_at_5 = len(relevant & set(retrieved[:5])) / len(relevant) if relevant else 0.0
+                r_at_1 = (
+                    len(relevant & set(retrieved[:1])) / len(relevant)
+                    if relevant
+                    else 0.0
+                )
+                r_at_3 = (
+                    len(relevant & set(retrieved[:3])) / len(relevant)
+                    if relevant
+                    else 0.0
+                )
+                r_at_5 = (
+                    len(relevant & set(retrieved[:5])) / len(relevant)
+                    if relevant
+                    else 0.0
+                )
 
                 results.append(
                     BenchmarkQuestionResult(
@@ -162,11 +174,31 @@ class BenchmarkRunner:
         normal_res = [r for r in results if r.kind == "normal"]
         trap_res = [r for r in results if r.kind == "trap"]
 
-        mrr = sum(r.reciprocal_rank or 0.0 for r in normal_res) / len(normal_res) if normal_res else 0.0
-        rec_1 = sum(r.recall_at_1 or 0.0 for r in normal_res) / len(normal_res) if normal_res else 0.0
-        rec_3 = sum(r.recall_at_3 or 0.0 for r in normal_res) / len(normal_res) if normal_res else 0.0
-        rec_5 = sum(r.recall_at_5 or 0.0 for r in normal_res) / len(normal_res) if normal_res else 0.0
-        rejection_rate = sum(1.0 for r in trap_res if r.is_correct_rejection) / len(trap_res) if trap_res else 1.0
+        mrr = (
+            sum(r.reciprocal_rank or 0.0 for r in normal_res) / len(normal_res)
+            if normal_res
+            else 0.0
+        )
+        rec_1 = (
+            sum(r.recall_at_1 or 0.0 for r in normal_res) / len(normal_res)
+            if normal_res
+            else 0.0
+        )
+        rec_3 = (
+            sum(r.recall_at_3 or 0.0 for r in normal_res) / len(normal_res)
+            if normal_res
+            else 0.0
+        )
+        rec_5 = (
+            sum(r.recall_at_5 or 0.0 for r in normal_res) / len(normal_res)
+            if normal_res
+            else 0.0
+        )
+        rejection_rate = (
+            sum(1.0 for r in trap_res if r.is_correct_rejection) / len(trap_res)
+            if trap_res
+            else 1.0
+        )
 
         sorted_latencies = sorted(latencies)
         p95_idx = max(0, math.ceil(0.95 * len(sorted_latencies)) - 1)
@@ -211,12 +243,18 @@ if __name__ == "__main__":
     print("          РЕЗУЛЬТАТЫ БЕНЧМАРКА BM25 (MedAI — КТ2)")
     print("=" * 70)
     print(f"Документов в корпусе:      {report.document_count}")
-    print(f"Всего тестовых запросов:   {report.question_count} (Нормальных: {report.normal_count}, Ловушек: {report.trap_count})")
+    print(
+        f"Всего тестовых запросов:   {report.question_count} (Нормальных: {report.normal_count}, Ловушек: {report.trap_count})"
+    )
     print("-" * 70)
     print(f"MRR (Mean Reciprocal Rank): {report.mrr:.4f}  (Цель: >= 0.80)")
     print(f"Recall@1:                   {report.recall_at_1:.4f}")
     print(f"Recall@3:                   {report.recall_at_3:.4f}  (Цель: >= 0.85)")
     print(f"Recall@5:                   {report.recall_at_5:.4f}  (Цель: >= 0.92)")
-    print(f"Correct Rejection Rate:     {report.correct_rejection_rate:.4f}  (Цель: 1.0000)")
-    print(f"Latency P95:                {report.latency_p95_ms:.3f} мс (Цель: <= 15.0 мс)")
+    print(
+        f"Correct Rejection Rate:     {report.correct_rejection_rate:.4f}  (Цель: 1.0000)"
+    )
+    print(
+        f"Latency P95:                {report.latency_p95_ms:.3f} мс (Цель: <= 15.0 мс)"
+    )
     print("=" * 70)

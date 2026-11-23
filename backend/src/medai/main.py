@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -20,7 +21,15 @@ from medai.auth import (
 )
 from medai.config import Config, load_config
 from medai.db.engine import create_engine
+from medai.dialogs import (
+    DialogService,
+    InMemoryDialogEventBroker,
+    PostgresHistoryStore,
+    create_dialogs_router,
+)
 from medai.observability import RequestLogMiddleware, configure_logging
+from medai.rag.analyzer import MorphAnalyzer
+from medai.rag.index import load_package_from_yaml
 
 __all__ = ["create_app"]
 
@@ -34,6 +43,7 @@ class HealthResponse(BaseModel):
 def create_app(
     config: Config | None = None,
     auth_service: AuthService | None = None,
+    dialog_service: DialogService | None = None,
 ) -> FastAPI:
     app_config = load_config() if config is None else config
     configure_logging(app_config.logging)
@@ -58,11 +68,37 @@ def create_app(
     else:
         service = auth_service
 
+    if dialog_service is None:
+        history_store = PostgresHistoryStore(engine)
+        event_broker = InMemoryDialogEventBroker()
+
+        root = Path(__file__).resolve().parents[4]
+        if not (root / "data").exists():
+            root = Path.cwd()
+            if (root / "backend").exists() and not (root / "data").exists():
+                root = root.parent
+        pkg_path = root / "data" / "medicines" / "package.yaml"
+
+        analyzer = MorphAnalyzer()
+        bm25_index = (
+            load_package_from_yaml(pkg_path, analyzer) if pkg_path.exists() else None
+        )
+
+        d_service = DialogService(
+            history_store=history_store,
+            event_broker=event_broker,
+            bm25_index=bm25_index,
+            analyzer=analyzer,
+        )
+    else:
+        d_service = dialog_service
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
             yield
         finally:
+            await d_service.shutdown()
             await engine.dispose()
 
     app = FastAPI(
@@ -73,6 +109,7 @@ def create_app(
     )
 
     app.state.auth_service = service
+    app.state.dialog_service = d_service
 
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(
@@ -84,6 +121,7 @@ def create_app(
     )
 
     app.include_router(create_auth_router(service, app_config.auth))
+    app.include_router(create_dialogs_router(d_service))
 
     @app.get("/api/v1/health", response_model=HealthResponse)
     async def health_check() -> dict[str, Any]:

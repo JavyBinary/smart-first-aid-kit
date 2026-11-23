@@ -14,7 +14,10 @@
 | **Поисковое ядро BM25** | Математический аппарат BM25, токенизация, лемматизация и параметры $k_1, b$ | [docs/bm25.md](bm25.md) |
 | **RAG и генерация** | Конвейер Context Injection, системные промпты и схемы валидации ответа | [docs/rag.md](rag.md) |
 | **Бенчмарк и оценка** | Формулы $MRR$, $Recall@k$, формат эталонного датасета и критерии приемки | [docs/benchmark.md](benchmark.md) |
-| **Контракты REST API** | Типизированные JSON-схемы эндпоинтов `/auth`, `/kit`, `/chat`, `/admin` | [docs/api.md](api.md) |
+| **Контракты REST API** | Типизированные JSON-схемы эндпоинтов `/auth`, `/dialogs`, `/kit`, `/chat`, `/admin` | [docs/api.md](api.md) |
+| **База данных и схема** | ERD-диаграмма PostgreSQL, SQLAlchemy 2.0 Core и миграции Alembic | [docs/database.md](database.md) |
+| **Аутентификация и сессии** | Argon2id, HS256 JWT, Refresh-токены, Cookie и Rate Limiting | [docs/auth.md](auth.md) |
+| **Диалоги и SSE стриминг** | Event Broker, очереди подписчиков, Server-Sent Events и Red Flags | [docs/dialogs.md](dialogs.md) |
 | **Роли и безопасность** | Персоны User и Admin, матрица разграничения доступа RBAC | [docs/roles.md](roles.md) |
 | **Интерфейс пользователя** | Дизайн-система Каты, цветовые токены, сценарии взаимодействия экранов | [docs/ui.md](ui.md) |
 

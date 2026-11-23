@@ -11,7 +11,9 @@ from medai.rag.index import load_package_from_yaml
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Load and validate medical knowledge package.")
+    parser = argparse.ArgumentParser(
+        description="Load and validate medical knowledge package."
+    )
     parser.add_argument(
         "--path",
         type=Path,

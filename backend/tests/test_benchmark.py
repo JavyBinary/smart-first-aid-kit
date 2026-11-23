@@ -46,18 +46,22 @@ def test_benchmark_runner_metrics_thresholds():
     assert report.mrr >= 0.80, f"MRR {report.mrr} is below target 0.80"
 
     # 2. Recall@3 >= 0.85 and Recall@5 >= 0.92
-    assert report.recall_at_3 >= 0.85, f"Recall@3 {report.recall_at_3} is below target 0.85"
-    assert report.recall_at_5 >= 0.92, f"Recall@5 {report.recall_at_5} is below target 0.92"
+    assert report.recall_at_3 >= 0.85, (
+        f"Recall@3 {report.recall_at_3} is below target 0.85"
+    )
+    assert report.recall_at_5 >= 0.92, (
+        f"Recall@5 {report.recall_at_5} is below target 0.92"
+    )
 
     # 3. Correct rejection rate for traps == 1.00
-    assert (
-        report.correct_rejection_rate == 1.00
-    ), f"Rejection rate {report.correct_rejection_rate} is below target 1.00"
+    assert report.correct_rejection_rate == 1.00, (
+        f"Rejection rate {report.correct_rejection_rate} is below target 1.00"
+    )
 
     # 4. Latency P95 <= 15.0 ms
-    assert (
-        report.latency_p95_ms <= 15.0
-    ), f"Latency P95 {report.latency_p95_ms}ms exceeds 15.0ms threshold"
+    assert report.latency_p95_ms <= 15.0, (
+        f"Latency P95 {report.latency_p95_ms}ms exceeds 15.0ms threshold"
+    )
 
 
 def test_run_benchmark_convenience():

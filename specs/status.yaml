@@ -39,3 +39,5 @@ specs:
       status: done
     - name: 020-bm25-core-corpus-and-benchmark
       status: done
+    - name: 021-dialogs-sse-and-chat-flow
+      status: done
