@@ -29,11 +29,17 @@ class AppStore {
       } catch (e) {}
     }
 
+    const savedRole = localStorage.getItem('medai_role') || 'user';
+    const isGuest = savedRole === 'guest';
+    const savedName = localStorage.getItem('medai_name');
+    const savedUser = localStorage.getItem('medai_user');
+
     this.state = {
       user: {
-        name: localStorage.getItem('medai_name') || 'Лука',
-        email: localStorage.getItem('medai_user') || 'luka@medai.ru',
-        role: localStorage.getItem('medai_role') || 'user'
+        name: isGuest ? 'Гость' : (savedName || 'Пользователь'),
+        email: isGuest ? '' : (savedUser || ''),
+        role: savedRole,
+        avatar: isGuest ? '' : (localStorage.getItem('medai_avatar') || '')
       },
       activeTab: 'chat', // 'chat' | 'catalog'
       kitItems: [],
@@ -157,7 +163,19 @@ class AppStore {
     if (userData.name) localStorage.setItem('medai_name', userData.name);
     if (userData.email) localStorage.setItem('medai_user', userData.email);
     if (userData.role) localStorage.setItem('medai_role', userData.role);
+    if (userData.avatar) localStorage.setItem('medai_avatar', userData.avatar);
     this.notify('user:updated', this.state.user);
+  }
+
+  logout() {
+    localStorage.removeItem('medai_token');
+    localStorage.removeItem('medai_user');
+    localStorage.removeItem('medai_name');
+    localStorage.removeItem('medai_role');
+    localStorage.removeItem('medai_avatar');
+    this.state.user = { name: 'Гость', email: '', role: 'guest', avatar: '' };
+    this.notify('user:updated', this.state.user);
+    window.location.href = 'login.html';
   }
 
   setRightActiveTab(tab) {
