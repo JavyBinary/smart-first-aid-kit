@@ -1,10 +1,11 @@
-.PHONY: help run-ui run-backend test bench lint format spec-list
+.PHONY: help run-ui dev-frontend run-backend test bench lint format spec-list
 
 PYTHON ?= python3
 
 help:
 	@echo "MedAI — Доступные команды сборки и запуска:"
-	@echo "  make run-ui       - Запуск веб-сервера интерфейса (порт 8000)"
+	@echo "  make run-ui       - Запуск модульного интерфейса на http://localhost:8000"
+	@echo "  make dev-frontend - Запуск Vite dev-сервера фронтенда (порт 3000)"
 	@echo "  make run-backend  - Запуск сервера FastAPI (Uvicorn, порт 8000)"
 	@echo "  make test         - Запуск модульных тестов"
 	@echo "  make bench        - Запуск бенчмарка BM25 (MRR, Recall@k)"
@@ -13,8 +14,16 @@ help:
 	@echo "  make spec-list    - Просмотр реестра спецификаций SDD"
 
 run-ui:
-	@echo "Запуск прототипа клиентского интерфейса на http://localhost:8000/ui/auth.html..."
-	$(PYTHON) -m http.server 8000
+	@echo "Запуск веб-сервера клиентского интерфейса на http://localhost:8000..."
+	@if [ -d "frontend" ]; then \
+		$(PYTHON) -m http.server 8000 --directory frontend; \
+	else \
+		$(PYTHON) -m http.server 8000; \
+	fi
+
+dev-frontend:
+	@echo "Запуск Vite Dev Server..."
+	@cd frontend && npm install && npm run dev
 
 run-backend:
 	@echo "Запуск сервера FastAPI..."

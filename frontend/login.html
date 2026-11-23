@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Аптечка — Вход в сервис</title>
+  <link rel="stylesheet" href="./src/styles/tokens.css">
+  <link rel="stylesheet" href="./src/styles/animations.css">
+  <link rel="stylesheet" href="./src/styles/layout.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-body);
+      min-height: 100vh;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 440px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 38px 36px 32px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      z-index: 10;
+      animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .login-brand-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 26px;
+      text-align: center;
+    }
+
+    .login-icon-box {
+      width: 58px;
+      height: 58px;
+      border-radius: var(--radius-md);
+      background: var(--brand-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: var(--shadow-brand);
+      margin-bottom: 14px;
+      position: relative;
+    }
+
+    .login-hat {
+      position: absolute;
+      top: -14px;
+      right: -10px;
+      width: 36px;
+      height: 36px;
+      transform: rotate(18deg);
+      pointer-events: none;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
+    }
+
+    .login-tabs {
+      display: flex;
+      background: #F1F3F5;
+      border-radius: var(--radius-full);
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+
+    .login-tab-btn {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      background: transparent;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .login-tab-btn.active {
+      background: #FFFFFF;
+      color: var(--brand-dark);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 14.5px;
+      font-family: inherit;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(0, 176, 116, 0.15);
+    }
+
+    .submit-btn {
+      width: 100%;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-brand);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+      background: var(--brand-hover);
+      transform: translateY(-2px);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="top-festive-shimmer"></div>
+  <div class="festive-garland-wrap">
+    <svg class="garland-svg-cord" viewBox="0 0 1200 24" preserveAspectRatio="none">
+      <path d="M 0,2 Q 37.5,14 75,2 Q 112.5,14 150,2 Q 187.5,14 225,2 Q 262.5,14 300,2 Q 337.5,14 375,2 Q 412.5,14 450,2 Q 487.5,14 525,2 Q 562.5,14 600,2 Q 637.5,14 675,2 Q 712.5,14 750,2 Q 787.5,14 825,2 Q 862.5,14 900,2 Q 937.5,14 975,2 Q 1012.5,14 1050,2 Q 1087.5,14 1125,2 Q 1162.5,14 1200,2" fill="none" stroke="rgba(30, 60, 45, 0.35)" stroke-width="1.5"/>
+    </svg>
+    <div class="garland-bulbs-container" id="garlandBulbs"></div>
+  </div>
+  <canvas id="ambientCanvas"></canvas>
+
+  <div class="login-card">
+    <div class="login-brand-header">
+      <div class="login-icon-box">
+        <svg class="login-hat" viewBox="0 0 60 60" fill="none">
+          <path d="M8 42 C 16 12, 40 14, 52 24 C 42 38, 36 42, 32 44 Z" fill="#E53935"/>
+          <circle cx="53" cy="24" r="7.5" fill="#FFFFFF"/>
+          <path d="M4 39 C 4 36, 7 34, 11 34 L 38 38 C 42 38, 45 41, 45 44 C 45 47, 42 50, 38 50 L 11 46 C 7 46, 4 43, 4 39 Z" fill="#FFFFFF"/>
+        </svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+          <path d="M12 2v20M2 12h20"/>
+        </svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h2 style="font-size: 22px; font-weight: 700; color: var(--brand-dark); letter-spacing: -0.02em;">Аптечка</h2>
+        <svg class="brand-christmas-tree" style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="none">
+          <polygon points="12,2 5,14 8,14 3,21 21,21 16,14 19,14" fill="#00A86B"/>
+          <circle cx="12" cy="7" r="1.4" fill="#FFB300"/>
+          <circle cx="8" cy="13" r="1.4" fill="#FF3B30"/>
+          <circle cx="16" cy="13" r="1.4" fill="#4EA8DE"/>
+          <circle cx="12" cy="18" r="1.4" fill="#FFD54F"/>
+          <rect x="10.5" y="21" width="3" height="3" fill="#8D6E63"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="login-tabs">
+      <button class="login-tab-btn active" id="tabLogin">Вход</button>
+      <button class="login-tab-btn" id="tabRegister">Регистрация</button>
+    </div>
+
+    <!-- Форма входа -->
+    <form id="loginForm">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="loginEmail" class="form-input" required placeholder="luka@medai.ru">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пароль</label>
+        <input type="password" id="loginPass" class="form-input" required minlength="6" placeholder="••••••••">
+      </div>
+      <button type="submit" class="submit-btn tap-effect">Войти в кабинет</button>
+    </form>
+
+    <!-- Форма регистрации -->
+    <form id="registerForm" style="display: none;">
+      <div class="form-group">
+        <label class="form-label">Имя пользователя</label>
+        <input type="text" id="regName" class="form-input" required placeholder="Лука">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="regEmail" class="form-input" required placeholder="luka@medai.ru">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пароль</label>
+        <input type="password" id="regPass" class="form-input" required minlength="6" placeholder="Минимум 6 знаков">
+      </div>
+      <button type="submit" class="submit-btn tap-effect">Создать аккаунт</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { AmbientBackground } from './src/components/AmbientBackground.js';
+    import { authApi } from './src/api/auth.api.js';
+
+    const canvas = document.getElementById('ambientCanvas');
+    if (canvas) new AmbientBackground(canvas);
+
+    const garlandBulbs = document.getElementById('garlandBulbs');
+    if (garlandBulbs) {
+      const colors = ['#FF3B30', '#FFB300', '#00B074', '#4EA8DE', '#AF52DE', '#FF9500'];
+      for (let i = 0; i < 32; i++) {
+        const node = document.createElement('div');
+        node.className = 'garland-bulb-node';
+        const col = colors[i % colors.length];
+        node.innerHTML = `
+          <div class="garland-bulb-socket"></div>
+          <div class="garland-bulb-lamp" style="background: ${col}; color: ${col}; animation-delay: ${(i * 0.12) % 1.8}s;"></div>
+        `;
+        garlandBulbs.appendChild(node);
+      }
+    }
+
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+
+    tabLogin.addEventListener('click', () => {
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      loginForm.style.display = 'block';
+      registerForm.style.display = 'none';
+    });
+
+    tabRegister.addEventListener('click', () => {
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      registerForm.style.display = 'block';
+      loginForm.style.display = 'none';
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      const res = await authApi.login(email, pass);
+
+      localStorage.setItem('medai_token', res.token);
+      localStorage.setItem('medai_user', res.user.email);
+      localStorage.setItem('medai_name', res.user.name);
+      localStorage.setItem('medai_role', res.user.role);
+
+      window.location.href = res.user.role === 'admin' ? 'admin.html' : 'index.html';
+    });
+
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const pass = document.getElementById('regPass').value;
+      const res = await authApi.register(name, email, pass);
+
+      localStorage.setItem('medai_token', res.token);
+      localStorage.setItem('medai_user', res.user.email);
+      localStorage.setItem('medai_name', res.user.name);
+      localStorage.setItem('medai_role', res.user.role);
+
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
