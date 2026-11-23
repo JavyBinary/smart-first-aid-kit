@@ -4,6 +4,33 @@
 
 ---
 
+## [0.4.0-kt2-stage-1] — 2026-11-24
+### Инфраструктурный фундамент Backend, конфигурация, наблюдаемость и Docker (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено:
+- **Инфраструктура `backend/` (`specs/changes/017-backend-infrastructure-scaffold`):**
+  - Создана декларативная конфигурация `backend/pyproject.toml` (Python `>=3.12`, сборщик `hatchling`) под управлением пакетного менеджера `uv`.
+  - Зафиксированы современные production-зависимости: FastAPI, Pydantic v2, SQLAlchemy 2.0 (asyncio), asyncpg, Alembic, Redis, PyJWT, Argon2-cffi, Pymorphy3, LiteLLM, Pytest, Ruff.
+  - Синхронизировано и зафиксировано виртуальное окружение в `backend/uv.lock`.
+- **Декларативная неизменяемая конфигурация (`backend/src/medai/config.py`):**
+  - Разработаны типизированные Pydantic v2 модели (`frozen=True`, `extra="forbid"`): `Config`, `DatabaseConfig`, `RedisConfig`, `AuthConfig`, `AuthRateLimitConfig`, `LiteLLMProviderConfig`, `LoggingConfig`.
+  - Фабрика `load_config(environ)` считывает переменные окружения строго один раз без скрытого runtime-парсинга `.env`.
+- **Наблюдаемость и структурированное логирование (`backend/src/medai/observability.py`):**
+  - Поддержка форматов `human` и `json` через кастомный `EventFormatter`.
+  - Белый список безопасных полей `_SAFE_FIELDS` для предотвращения утечек персональных данных, токенов и паролей.
+  - Изоляция контекста запроса через `ContextVars` (`request_id`, `dialog_id`).
+  - Асинхронный middleware `RequestLogMiddleware` для внедрения `x-request-id` в HTTP-ответы, замера длительности `duration_ms` и логирования жизненного цикла запросов (`started`, `completed`, `failed`, `cancelled`).
+- **Контейнеризация контура (`docker/`):**
+  - `docker/compose.yaml` объединяет сервисы PostgreSQL 17, Redis 7, Backend (FastAPI), Frontend (Nginx) и обратный прокси Caddy (порт 8090).
+  - Сборка образов через `docker/Dockerfile`, `docker/frontend.Dockerfile`, маршрутизация в `docker/Caddyfile` и `docker/nginx.conf`.
+- **Единый фасад команд (`Makefile`):**
+  - Добавлены команды `make run-backend`, `make test`, `make lint`, `make format`, бесшовно работающие через `uv`.
+- **Верификация и тесты:**
+  - 10 unit-тестов в `backend/tests/test_config.py` и `backend/tests/test_observability.py` пройдены со 100% успехом.
+  - Линтер `ruff` подтверждает соответствие кода стандартам качества.
+
+---
+
 ## [0.3.0-ui-redesign] — 2026-11-22
 ### Модульный редизайн интерфейса и интерактивная функциональность (Ветка: feat/ui-redesign)
 

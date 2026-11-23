@@ -31,3 +31,5 @@ specs:
       status: done
     - name: 016-ui-auth-rbac-avatar-refinements
       status: done
+    - name: 017-backend-infrastructure-scaffold
+      status: done
