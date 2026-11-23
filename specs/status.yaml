@@ -35,3 +35,5 @@ specs:
       status: done
     - name: 018-db-schema-and-migrations
       status: done
+    - name: 019-auth-sessions-and-rate-limiting
+      status: done

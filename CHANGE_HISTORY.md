@@ -4,6 +4,33 @@
 
 ---
 
+## [0.4.0-kt2-stage-3] — 2026-11-24
+### Подсистема аутентификации, сессий, Rate Limiting и CLI create-admin (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено:
+- **Криптостойкое хеширование паролей (`backend/src/medai/auth/passwords.py`):**
+  - Реализован класс `Argon2PasswordHasher` (Argon2id, RFC 9106) с выносом операций в пул потоков и ограничением семафором `asyncio.Semaphore(4)`.
+  - Внедрена защита от тайминг-атак при неверном логине через предварительно вычисленный `dummy_hash`.
+- **Токены и сессии (`backend/src/medai/auth/tokens.py`, `service.py`, `postgres.py`):**
+  - Класс `TokenCodec` для генерации и верификации HS256 JWT Access токенов с клеймами (`sub`, `role`, `sid`, `fid`).
+  - Генерация криптостойких Refresh токенов (`secrets.token_urlsafe(32)`) и их хранение в PostgreSQL в виде хэшей SHA-256.
+  - Механизм ротации токенов и защиты от компрометации (Token Family Revocation) с каскадным отзывом семейств при попытке повторного использования.
+- **Ограничение частоты запросов (`backend/src/medai/auth/rate_limiter.py`):**
+  - `InMemoryRateLimiter` с контролем попыток по IP-адресу и блокировкой перебора паролей (Brute-Force).
+- **REST API авторизации с защищенными Cookie (`backend/src/medai/auth/router.py`):**
+  - Эндпоинты `/api/v1/auth/register`, `/login`, `/refresh`, `/logout`, `/me`.
+  - Установка и очистка `HttpOnly`, `SameSite=Lax` Cookie.
+- **Интерактивная консольная утилита создания администратора (`backend/src/medai/create_admin.py`):**
+  - Безопасный ввод пароля через `getpass` без вывода в консоль и без сохранения в shell history.
+  - Добавлена фасадная команда `make create-admin EMAIL=<email> [ROLE=admin|superadmin]` в [Makefile](Makefile).
+- **Архитектурная документация:**
+  - Создан документ [docs/auth.md](docs/auth.md) со схемой sequence и инвариантами безопасности.
+- **Верификация:**
+  - 25 тестов в `make test` пройдены со 100% успехом.
+  - Линтер `ruff` подтверждает соответствие кода стандартам качества.
+
+---
+
 ## [0.4.0-kt2-stage-2] — 2026-11-24
 ### Схема БД PostgreSQL, SQLAlchemy 2.0 Core и миграции Alembic (Ветка: feat/kt2-backend-rag)
 

@@ -1,4 +1,4 @@
-.PHONY: help run run-ui dev-frontend run-backend migrate test bench lint format spec-list
+.PHONY: help run run-ui dev-frontend run-backend migrate create-admin test bench lint format spec-list
 
 PYTHON ?= python3
 
@@ -9,6 +9,7 @@ help:
 	@echo "  make dev-frontend - Запуск Vite dev-сервера фронтенда (порт 3000)"
 	@echo "  make run-backend  - Запуск сервера FastAPI через uv (Uvicorn, порт 8000)"
 	@echo "  make migrate      - Применение миграций схемы базы данных (Alembic)"
+	@echo "  make create-admin - Создание учетной записи администратора (EMAIL=<email> [ROLE=admin|superadmin])"
 	@echo "  make test         - Запуск модульных тестов backend и интеграционных проверок"
 	@echo "  make bench        - Запуск бенчмарка BM25 (MRR, Recall@k)"
 	@echo "  make lint         - Проверка качества кода линтером (Ruff + синтаксис)"
@@ -38,6 +39,13 @@ run-backend:
 migrate:
 	@echo "Применение миграций базы данных Alembic..."
 	@cd backend && uv run python -m medai.db.migrate
+
+create-admin:
+	@test -n "$(EMAIL)" || { \
+		echo "Использование: make create-admin EMAIL=<email> [ROLE=admin|superadmin] [NAME=<name>]" >&2; \
+		exit 2; \
+	}
+	@cd backend && uv run python -m medai.create_admin --email "$(EMAIL)" --role "$(or $(ROLE),admin)" --name "$(or $(NAME),Администратор MedAI)"
 
 test:
 	@echo "Запуск тестов backend..."
