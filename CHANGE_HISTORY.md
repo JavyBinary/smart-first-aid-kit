@@ -4,6 +4,29 @@
 
 ---
 
+## [0.4.0-kt2-stage-6] — 2026-11-24
+### REST API аптечки, профиль здоровья и финализация КТ2 (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено:
+- **Управление аптечкой пользователя (`backend/src/medai/kit/`):**
+  - Модели `KitItem`, `CreateKitItemRequest`, `UpdateKitItemRequest`, `KitListResponse` с автоматическим расчетом статуса истечения срока годности `is_expired`.
+  - Хранилища `PostgresKitStore` (SQLAlchemy 2.0 Core таблица `user_kits`) и `InMemoryKitStore` с изоляцией по `user_id`.
+  - REST эндпоинты `/api/v1/kit` (GET, POST `/items`, PUT `/items/{id}`, DELETE `/items/{id}`).
+- **Профиль здоровья и медкарта (`backend/src/medai/profile/`):**
+  - Модели `HealthProfile`, `UpdateHealthProfileRequest` с валидацией физиологических диапазонов (возраст 0–130, вес 1.0–300.0) и поддержкой алиасов `chronic` / `chronic_diseases`.
+  - Хранилища `PostgresProfileStore` (таблица `health_profiles`) и `InMemoryProfileStore` с автоматической инициализацией профиля по умолчанию.
+  - REST эндпоинты `/api/v1/profile` (GET, PUT).
+- **Интеграция контура и Caddy:**
+  - Полная связка маршрутов `/api/v1/kit`, `/api/v1/profile`, `/api/v1/dialogs`, `/api/v1/auth` и `/api/v1/chat/query` в едином FastAPI приложении.
+  - Проверена сквозная маршрутизация обратного прокси Caddy (`docker/Caddyfile`) и Vite dev proxy (`frontend/vite.config.js`).
+- **Верификация и завершение КТ2:**
+  - 47 тестов в `make test` пройдены со 100% успехом.
+  - Линтер `make lint` подтверждает безупречное качество кода.
+  - Поисковое ядро `make bench` подтверждает $MRR = 1.0000$, $Recall@3 = 0.9333$, $Recall@5 = 1.0000$, Rejection Rate $= 1.0000$, задержку $P_{95} = 3.23\text{ мс}$.
+  - Все 6 этапов Контрольной точки 2 (КТ2) успешно выполнены в строгом соответствии с методологией SDD.
+
+---
+
 ## [0.4.0-kt2-stage-5] — 2026-11-24
 ### История диалогов, брокер событий и потоковая передача SSE (Ветка: feat/kt2-backend-rag)
 

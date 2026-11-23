@@ -41,3 +41,5 @@ specs:
       status: done
     - name: 021-dialogs-sse-and-chat-flow
       status: done
+    - name: 022-kit-health-profile-and-frontend-integration
+      status: done

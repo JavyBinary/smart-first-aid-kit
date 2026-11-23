@@ -133,7 +133,50 @@
 
 ---
 
-## 4. Эндпоинт интеллектуального RAG-диалога (`/chat`)
+## 4. Эндпоинты профиля здоровья (`/profile`)
+
+### 4.1. Получение профиля (медицинской карты)
+`GET /api/v1/profile`
+- **Response (`200 OK`):**
+```json
+{
+  "age": 28,
+  "weight_kg": 72.0,
+  "chronic_diseases": ["Язвенная болезнь ЖКТ"],
+  "allergies": ["НПВП (Аспирин/Ибупрофен)"],
+  "special_notes": "Аллергия на пенициллиновый ряд"
+}
+```
+
+### 4.2. Обновление профиля здоровья
+`PUT /api/v1/profile`
+- **Request:**
+```json
+{
+  "age": 29,
+  "weight_kg": 73.5,
+  "chronic": ["Язвенная болезнь ЖКТ", "Гастрит"],
+  "allergies": ["НПВП (Аспирин/Ибупрофен)"]
+}
+```
+- **Response (`200 OK`):** возвращает обновленный объект `HealthProfile`.
+
+---
+
+## 5. Эндпоинты диалогов и SSE стриминга (`/dialogs`)
+
+Подробная архитектурная спецификация и sequence-диаграмма представлены в [docs/dialogs.md](dialogs.md).
+
+- `POST /api/v1/dialogs` — создание нового диалога (`201 Created`).
+- `GET /api/v1/dialogs` — постраничный список диалогов пользователя (`200 OK`).
+- `GET /api/v1/dialogs/{id}/messages` — стенограмма сообщений диалога (`200 OK`).
+- `DELETE /api/v1/dialogs/{id}` — удаление диалога (`204 No Content`).
+- `POST /api/v1/dialogs/{id}/messages` — постановка сообщения в очередь (`202 Accepted`).
+- `GET /api/v1/dialogs/{id}/events` — Server-Sent Events (`text/event-stream`).
+
+---
+
+## 6. Эндпоинт интеллектуального RAG-диалога (`/chat`)
 
 ### 4.1. Отправка симптоматического запроса
 `POST /api/v1/chat/query`

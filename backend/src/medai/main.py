@@ -27,7 +27,9 @@ from medai.dialogs import (
     PostgresHistoryStore,
     create_dialogs_router,
 )
+from medai.kit import KitStore, PostgresKitStore, create_kit_router
 from medai.observability import RequestLogMiddleware, configure_logging
+from medai.profile import PostgresProfileStore, ProfileStore, create_profile_router
 from medai.rag.analyzer import MorphAnalyzer
 from medai.rag.index import load_package_from_yaml
 
@@ -44,6 +46,8 @@ def create_app(
     config: Config | None = None,
     auth_service: AuthService | None = None,
     dialog_service: DialogService | None = None,
+    kit_store: KitStore | None = None,
+    profile_store: ProfileStore | None = None,
 ) -> FastAPI:
     app_config = load_config() if config is None else config
     configure_logging(app_config.logging)
@@ -93,6 +97,9 @@ def create_app(
     else:
         d_service = dialog_service
 
+    k_store = PostgresKitStore(engine) if kit_store is None else kit_store
+    p_store = PostgresProfileStore(engine) if profile_store is None else profile_store
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
@@ -110,6 +117,8 @@ def create_app(
 
     app.state.auth_service = service
     app.state.dialog_service = d_service
+    app.state.kit_store = k_store
+    app.state.profile_store = p_store
 
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(
@@ -122,6 +131,8 @@ def create_app(
 
     app.include_router(create_auth_router(service, app_config.auth))
     app.include_router(create_dialogs_router(d_service))
+    app.include_router(create_kit_router(k_store))
+    app.include_router(create_profile_router(p_store))
 
     @app.get("/api/v1/health", response_model=HealthResponse)
     async def health_check() -> dict[str, Any]:
