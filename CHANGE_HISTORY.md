@@ -4,6 +4,28 @@
 
 ---
 
+## [0.4.0-kt2-stage-2] — 2026-11-24
+### Схема БД PostgreSQL, SQLAlchemy 2.0 Core и миграции Alembic (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено:
+- **Реляционная схема БД (`specs/changes/018-db-schema-and-migrations`, `backend/src/medai/db/tables.py`):**
+  - Описаны 8 таблиц на чистом SQLAlchemy 2.0 Core: `users`, `refresh_sessions`, `user_kits`, `health_profiles`, `dialogs`, `messages`, `rag_medicines`, `rag_bm25_index`.
+  - Внедрены строгие ограничения целостности (Check Constraints) на роли (`user`, `admin`, `superadmin`), валидность email, статусы медикаментов (`otc`, `rx`), возраст (0–130) и вес (1.0–300.0).
+  - Настроены каскадные внешние ключи (`ON DELETE CASCADE`) и уникальные индексы (`users_email_lower_key`, `(dialog_id, position)`).
+- **Безопасная фабрика соединений (`backend/src/medai/db/engine.py`):**
+  - Функция `create_engine` с пулом соединений (`pool_size=10`, `max_overflow=20`), `pool_pre_ping=True` и `hide_parameters=True` для защиты секретов.
+- **Инфраструктура миграций Alembic (`backend/src/medai/db/migrations/`):**
+  - Асинхронный запуск в `env.py` через `run_sync` с передачей метаданных `metadata`.
+  - Стартовая ревизия `0001_initial_schema.py` для развертывания всех сущностей.
+  - Программный раннер `migrate.py` и команда `make migrate` в [Makefile](Makefile).
+- **Архитектурная документация:**
+  - Создан документ [docs/database.md](docs/database.md) с ERD-диаграммой и регламентом безопасности данных.
+- **Верификация:**
+  - 19 тестов в `make test` пройдены со 100% успехом.
+  - Линтер `ruff` подтверждает соответствие кода стандартам качества.
+
+---
+
 ## [0.4.0-kt2-stage-1] — 2026-11-24
 ### Инфраструктурный фундамент Backend, конфигурация, наблюдаемость и Docker (Ветка: feat/kt2-backend-rag)
 

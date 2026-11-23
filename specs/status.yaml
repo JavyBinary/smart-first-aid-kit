@@ -33,3 +33,5 @@ specs:
       status: done
     - name: 017-backend-infrastructure-scaffold
       status: done
+    - name: 018-db-schema-and-migrations
+      status: done

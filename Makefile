@@ -1,4 +1,4 @@
-.PHONY: help run run-ui dev-frontend run-backend test bench lint format spec-list
+.PHONY: help run run-ui dev-frontend run-backend migrate test bench lint format spec-list
 
 PYTHON ?= python3
 
@@ -8,6 +8,7 @@ help:
 	@echo "  make run-ui       - Запуск клиентского интерфейса на http://localhost:8000"
 	@echo "  make dev-frontend - Запуск Vite dev-сервера фронтенда (порт 3000)"
 	@echo "  make run-backend  - Запуск сервера FastAPI через uv (Uvicorn, порт 8000)"
+	@echo "  make migrate      - Применение миграций схемы базы данных (Alembic)"
 	@echo "  make test         - Запуск модульных тестов backend и интеграционных проверок"
 	@echo "  make bench        - Запуск бенчмарка BM25 (MRR, Recall@k)"
 	@echo "  make lint         - Проверка качества кода линтером (Ruff + синтаксис)"
@@ -33,6 +34,10 @@ dev-frontend:
 run-backend:
 	@echo "Запуск сервера FastAPI (MedAI Backend)..."
 	@cd backend && uv run uvicorn medai.main:app --reload --port 8000
+
+migrate:
+	@echo "Применение миграций базы данных Alembic..."
+	@cd backend && uv run python -m medai.db.migrate
 
 test:
 	@echo "Запуск тестов backend..."
