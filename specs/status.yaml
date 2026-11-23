@@ -29,3 +29,5 @@ specs:
       status: done
     - name: 015-ui-custom-medicine-addition
       status: done
+    - name: 016-ui-auth-rbac-avatar-refinements
+      status: done
