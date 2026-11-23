@@ -83,7 +83,7 @@ export class ColabRunner {
 
         <!-- Облачко реплики (НЕ внутри flipped, чтобы текст никогда не зеркалился!) -->
         <div class="colab-speech-popup ${isTopLane ? 'show-below' : 'show-above'}">
-          Будьте здоровы! ❤️
+          Будьте здоровы!
         </div>
       </div>
     `;

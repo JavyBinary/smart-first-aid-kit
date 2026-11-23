@@ -200,20 +200,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     profileSettingsBtn.addEventListener('click', () => accountModal.open());
   }
 
+  const railLogoutBtn = document.getElementById('railLogoutBtn');
+  if (railLogoutBtn) {
+    railLogoutBtn.addEventListener('click', () => {
+      store.logout();
+    });
+  }
+
   const adminBtn = document.getElementById('adminQuickSwitchBtn');
   function syncAdminVisibility(user) {
     if (adminBtn) {
-      const isAdmin = user && user.role === 'admin';
+      const isAdmin = user && (user.role === 'admin' || user.role === 'superadmin');
       adminBtn.style.display = isAdmin ? 'flex' : 'none';
     }
   }
-  syncAdminVisibility(store.getState().user);
+  
+  function applyUserProfile(user) {
+    const isGuest = user.role === 'guest' || !user.email;
+    const nameEl = document.querySelector('.user-meta-name');
+    if (nameEl) nameEl.textContent = isGuest ? 'Гость' : (user.name || 'Пользователь');
+
+    const statusEl = document.querySelector('.user-meta-status');
+    if (statusEl) {
+      if (isGuest) {
+        statusEl.textContent = 'Гостевой режим';
+      } else if (user.role === 'superadmin') {
+        statusEl.textContent = 'Суперадминистратор';
+      } else if (user.role === 'admin') {
+        statusEl.textContent = 'Администратор';
+      } else {
+        statusEl.textContent = 'Личный профиль';
+      }
+    }
+    
+    const avatarEl = document.querySelector('.user-avatar-circle');
+    if (avatarEl) {
+      if (user.avatar) {
+        avatarEl.innerHTML = `<img src="${user.avatar}" alt="${user.name || 'Аватар'}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+      } else if (isGuest) {
+        avatarEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+      } else {
+        avatarEl.textContent = (user.name || 'П')[0].toUpperCase();
+      }
+    }
+    syncAdminVisibility(user);
+  }
+
+  // Применяем профиль немедленно при загрузке
+  applyUserProfile(store.getState().user);
 
   store.subscribe('user:updated', (user) => {
-    const nameEl = document.querySelector('.user-meta-name');
-    if (nameEl) nameEl.textContent = user.name || 'Лука';
-    const avatarEl = document.querySelector('.user-avatar-circle');
-    if (avatarEl) avatarEl.textContent = (user.name || 'Л')[0].toUpperCase();
-    syncAdminVisibility(user);
+    applyUserProfile(user);
   });
 });

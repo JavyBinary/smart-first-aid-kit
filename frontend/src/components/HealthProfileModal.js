@@ -45,7 +45,7 @@ export class HealthProfileModal {
 
         <div style="margin-bottom: 20px;">
           <label style="font-size: 13px; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 8px;">
-            ⚠️ Аллергии и непереносимости:
+            Аллергии и непереносимости:
           </label>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             ${ALLERGIES_LIST.map(a => `
@@ -61,7 +61,7 @@ export class HealthProfileModal {
 
         <div style="margin-bottom: 24px;">
           <label style="font-size: 13px; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 8px;">
-            🩺 Хронические заболевания:
+            Хронические заболевания:
           </label>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             ${CHRONIC_LIST.map(c => `

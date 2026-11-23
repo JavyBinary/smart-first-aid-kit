@@ -115,7 +115,7 @@ export class Chat {
     bar.style.display = 'flex';
     bar.innerHTML = pills.map(p => `
       <div class="selected-med-pill">
-        <span>💊 ${p.name} (${p.dosage})</span>
+        <span>${p.name} (${p.dosage})</span>
         <button class="selected-med-pill-remove" data-id="${p.id}">&times;</button>
       </div>
     `).join('');
@@ -139,7 +139,7 @@ export class Chat {
     const state = store.getState();
     const session = state.sessions.find(s => s.id === state.activeSessionId);
     const messages = session ? session.messages : [];
-    const userName = (state.user && state.user.name) ? state.user.name : 'Лука';
+    const userName = (state.user && state.user.name) ? state.user.name : 'друг';
 
     if (!messages.length) {
       list.className = 'chat-messages-container empty';
@@ -165,7 +165,7 @@ export class Chat {
             <div class="message-bubble">
               ${msg.attachedPills && msg.attachedPills.length ? `
                 <div style="font-size: 12px; margin-bottom: 6px; opacity: 0.9;">
-                  💊 Контекст: ${msg.attachedPills.map(p => p.name).join(', ')}
+                  Выбранные препараты: ${msg.attachedPills.map(p => p.name).join(', ')}
                 </div>
               ` : ''}
               ${msg.text}
