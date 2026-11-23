@@ -21,7 +21,12 @@ export class AddMedicineModal {
       <div class="custom-med-modal-card">
         <div class="modal-header">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="custom-med-icon-box">💊</div>
+            <div class="custom-med-icon-box" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </div>
             <div>
               <div class="modal-title" style="font-size: 16px; font-weight: 700; color: var(--brand-dark);">Добавить свой препарат</div>
               <div class="modal-subtitle" style="font-size: 12px; color: var(--text-muted); margin-top: 1px;">Лекарство появится в вашей домашней аптечке</div>
