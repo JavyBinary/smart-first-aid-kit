@@ -37,3 +37,5 @@ specs:
       status: done
     - name: 019-auth-sessions-and-rate-limiting
       status: done
+    - name: 020-bm25-core-corpus-and-benchmark
+      status: done

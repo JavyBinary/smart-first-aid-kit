@@ -1,4 +1,4 @@
-.PHONY: help run run-ui dev-frontend run-backend migrate create-admin test bench lint format spec-list
+.PHONY: help run run-ui dev-frontend run-backend migrate create-admin test bench knowledge-load lint format spec-list
 
 PYTHON ?= python3
 
@@ -12,6 +12,7 @@ help:
 	@echo "  make create-admin - Создание учетной записи администратора (EMAIL=<email> [ROLE=admin|superadmin])"
 	@echo "  make test         - Запуск модульных тестов backend и интеграционных проверок"
 	@echo "  make bench        - Запуск бенчмарка BM25 (MRR, Recall@k)"
+	@echo "  make knowledge-load - Загрузка и валидация пакета знаний (DIR=<dir>)"
 	@echo "  make lint         - Проверка качества кода линтером (Ruff + синтаксис)"
 	@echo "  make format       - Автоматическое форматирование кода (Ruff)"
 	@echo "  make spec-list    - Просмотр реестра спецификаций SDD"
@@ -59,11 +60,17 @@ test:
 
 bench:
 	@echo "Запуск бенчмарка поискового ядра BM25..."
-	@if [ -f "benchmark/run.py" ]; then \
+	@if [ -d "backend" ] && command -v uv >/dev/null 2>&1; then \
+		cd backend && uv run python -m medai.rag.benchmark; \
+	elif [ -f "benchmark/run.py" ]; then \
 		$(PYTHON) -m benchmark.run; \
 	else \
-		echo "Бенчмарк-раннер будет реализован на этапе КТ2 (модуль Луки). См. docs/benchmark.md"; \
+		echo "Бенчмарк-раннер не найден."; \
 	fi
+
+knowledge-load:
+	@echo "Загрузка и валидация медицинского корпуса BM25..."
+	@cd backend && uv run python -m medai.rag.knowledge_load $(if $(DIR),--dir "$(DIR)",)
 
 lint:
 	@echo "Проверка линтером Ruff..."
