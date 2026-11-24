@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -31,7 +30,7 @@ from medai.kit import KitStore, PostgresKitStore, create_kit_router
 from medai.observability import RequestLogMiddleware, configure_logging
 from medai.profile import PostgresProfileStore, ProfileStore, create_profile_router
 from medai.rag.analyzer import MorphAnalyzer
-from medai.rag.index import load_package_from_yaml
+from medai.rag.index import find_data_dir, load_package_from_yaml
 
 __all__ = ["create_app"]
 
@@ -76,12 +75,7 @@ def create_app(
         history_store = PostgresHistoryStore(engine)
         event_broker = InMemoryDialogEventBroker()
 
-        root = Path(__file__).resolve().parents[4]
-        if not (root / "data").exists():
-            root = Path.cwd()
-            if (root / "backend").exists() and not (root / "data").exists():
-                root = root.parent
-        pkg_path = root / "data" / "medicines" / "package.yaml"
+        pkg_path = find_data_dir() / "medicines" / "package.yaml"
 
         analyzer = MorphAnalyzer()
         bm25_index = (

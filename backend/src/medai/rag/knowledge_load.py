@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from medai.rag.analyzer import MorphAnalyzer
-from medai.rag.index import load_package_from_yaml
+from medai.rag.index import find_data_dir, load_package_from_yaml
 
 
 def main() -> None:
@@ -28,17 +28,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[4]
-    if not (root / "data").exists():
-        root = Path.cwd()
-        if (root / "backend").exists() and not (root / "data").exists():
-            root = root.parent
+    data_dir = find_data_dir()
 
     target_path = args.path
     if not target_path and args.dir:
         target_path = args.dir / "package.yaml"
     if not target_path:
-        target_path = root / "data" / "medicines" / "package.yaml"
+        target_path = data_dir / "medicines" / "package.yaml"
 
     if not target_path.exists():
         print(f"Ошибка: файл пакета знаний не найден: {target_path}", file=sys.stderr)

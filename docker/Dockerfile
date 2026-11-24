@@ -15,10 +15,11 @@ COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 
 COPY backend/src ./src
+COPY data ./data
 RUN uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
 
-CMD ["uvicorn", "medai.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["sh", "-c", "python -m medai.db.migrate && uvicorn medai.main:app --host 0.0.0.0 --port 8000 --no-access-log"]

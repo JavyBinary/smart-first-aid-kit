@@ -11,7 +11,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from medai.rag.analyzer import MorphAnalyzer, TextAnalyzer
-from medai.rag.index import load_package_from_yaml
+from medai.rag.index import find_data_dir, load_package_from_yaml
 
 __all__ = [
     "BenchmarkQuestion",
@@ -223,15 +223,9 @@ def run_benchmark(
     package_path: Path | None = None,
     queries_path: Path | None = None,
 ) -> BenchmarkReport:
-    # Go up from backend/src/medai/rag/benchmark.py (5 levels) to workspace root
-    root = Path(__file__).resolve().parents[4]
-    if not (root / "data").exists():
-        # Fallback to current working directory
-        root = Path.cwd()
-        if (root / "backend").exists() and not (root / "data").exists():
-            root = root.parent
-    pkg = package_path or (root / "data" / "medicines" / "package.yaml")
-    queries = queries_path or (root / "data" / "benchmark_queries.yaml")
+    data_dir = find_data_dir()
+    pkg = package_path or (data_dir / "medicines" / "package.yaml")
+    queries = queries_path or (data_dir / "benchmark_queries.yaml")
 
     runner = BenchmarkRunner()
     return runner.run(pkg, queries)

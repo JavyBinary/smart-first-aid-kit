@@ -14,8 +14,24 @@ from medai.rag.models import MedicineDocument, MedicinePackage, SearchResult
 
 __all__ = [
     "InMemoryBm25Index",
+    "find_data_dir",
     "load_package_from_yaml",
 ]
+
+
+def find_data_dir() -> Path:
+    """Find data directory robustly in dev, worktree, and docker container."""
+    cur = Path(__file__).resolve().parent
+    for p in (cur, *cur.parents):
+        candidate = p / "data"
+        if candidate.is_dir():
+            return candidate
+    cwd = Path.cwd().resolve()
+    for p in (cwd, *cwd.parents):
+        candidate = p / "data"
+        if candidate.is_dir():
+            return candidate
+    return Path("/app/data")
 
 
 class InMemoryBm25Index:
