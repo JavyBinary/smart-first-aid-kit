@@ -85,3 +85,35 @@ Latency P95:                3.807 мс (Цель: <= 15.0 мс)
 - **REQ-006 (Cookie Auth & Session Restore):** `client.js` использует относительный путь `/api/v1` и `credentials: 'include'`; сессия восстанавливается через `GET /api/v1/auth/me`.
 - **REQ-007 (Empty Default State):** Удален `DEFAULT_KIT` и дефолтные аллергии; новые пользователи начинают с чистой аптечкой и чистой медкартой.
 - **REQ-008 (Admin Table Integration):** Таблица в `admin.html` динамически загружает зарегистрированных пользователей через `authApi.getAdminUsers()`.
+
+### 4. Комплексная E2E верификация в Docker Compose (`http://127.0.0.1:8090`)
+
+1. **Немедицинский запрос («как готовить блины»):**
+   ```bash
+   curl -s -X POST http://127.0.0.1:8090/api/v1/chat/query \
+     -H "Content-Type: application/json" \
+     -d '{"query":"как готовить блины"}'
+   ```
+   **Результат:** Статус 200 OK, `status: "out_of_domain"`, `recommendation: null`, корректный вежливый отказ без сбоя в чате.
+
+2. **Запрос с лекарством из аптечки («что это» + «Парацетамол»):**
+   ```bash
+   curl -s -X POST http://127.0.0.1:8090/api/v1/chat/query \
+     -H "Content-Type: application/json" \
+     -d '{"query":"что это", "selected_pills":["Парацетамол"]}'
+   ```
+   **Результат:** Статус 200 OK, `status: "success"`, подробное описание препарата, дозировка, противопоказания и структурированная карточка.
+
+3. **Регистрация пользователя, HttpOnly cookies и восстановление сессии:**
+   ```bash
+   curl -s -i -c /tmp/cookies.txt -X POST http://127.0.0.1:8090/api/v1/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Тестовый Юзер","email":"testuser@medai.local","password":"SecurePassword123!"}'
+   curl -s -i -b /tmp/cookies.txt http://127.0.0.1:8090/api/v1/auth/me
+   ```
+   **Результат:** 200 OK, куки `access_token` и `refresh_token` установлены, `GET /api/v1/auth/me` возвращает профиль пользователя.
+
+4. **Административный эндпоинт (`GET /api/v1/auth/admin/users`):**
+   - Без авторизации: 401 Unauthorized (`Authentication required`).
+   - С ролью superadmin: 200 OK, возвращен актуальный список пользователей из PostgreSQL.
+
