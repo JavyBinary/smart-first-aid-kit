@@ -69,11 +69,12 @@ class SubmitMessageRequest(BaseModel):
 
 
 class ChatQueryRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     query: str = Field(min_length=1)
     include_kit_context: bool = True
     user_kit_names: list[str] = Field(default_factory=list)
+    selected_pills: list[str] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):
@@ -263,8 +264,9 @@ def create_dialogs_router(dialog_service: DialogService) -> APIRouter:
 
     @router.post("/chat/query", response_model=ChatQueryResponse)
     async def chat_query(body: ChatQueryRequest) -> ChatQueryResponse:
+        kit_names = list(body.user_kit_names) + list(body.selected_pills)
         res = dialog_service.process_query_sync(
-            query=body.query, user_kit_names=body.user_kit_names
+            query=body.query, user_kit_names=kit_names
         )
         return ChatQueryResponse.model_validate(res)
 

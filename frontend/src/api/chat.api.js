@@ -21,19 +21,37 @@ export const chatApi = {
     }
 
     // 2. Попытка запроса к FastAPI бэкенду
+    const pillNames = (selectedPills || []).map(p => (typeof p === 'string' ? p : p.name)).filter(Boolean);
+    const kitNames = (userKitItems || []).map(i => (typeof i === 'string' ? i : i.name)).filter(Boolean);
+
     const res = await request('/chat/query', {
       method: 'POST',
-      body: JSON.stringify({ query: queryText, include_kit_context: true })
+      body: JSON.stringify({
+        query: queryText || (pillNames.length ? `Что это за препарат ${pillNames.join(', ')}?` : 'Консультация по симптомам'),
+        include_kit_context: true,
+        selected_pills: pillNames,
+        user_kit_names: kitNames
+      })
     });
 
-    if (!res._fallback && res.recommendation) {
+    if (!res._fallback) {
       return res;
     }
 
     // 3. Автономный локальный RAG-ответ (Seamless Fallback)
-    // Подбор препарата на основе аптечки
-    let recommended = 'Ибупрофен';
-    let inKit = userKitItems.some(i => i.name.toLowerCase().includes('ибупрофен'));
+    const isOutOfDomain = ['блин', 'блины', 'рецепт', 'готовить', 'суп', 'пирог', 'питон', 'python', 'код', 'стих'].some(kw => q.includes(kw));
+    if (isOutOfDomain) {
+      return {
+        status: 'out_of_domain',
+        emergency_mode: false,
+        message: 'Я медицинский ассистент MedAI и специализируюсь исключительно на вопросах здоровья, доврачебной помощи и препаратах домашней аптечки.\n\nЯ не могу проконсультировать по кулинарным, бытовым или техническим темам, но с радостью отвечу на вопросы о симптомах, медикаментах и оказании первой помощи.',
+        disclaimer: 'Информация носит ознакомительный доврачебный характер.'
+      };
+    }
+
+    // Подбор препарата на основе аптечки или выбранного лекарства
+    let recommended = pillNames.length ? pillNames[0] : 'Ибупрофен';
+    let inKit = userKitItems.some(i => i.name.toLowerCase().includes(recommended.toLowerCase()));
     let dosage = '1 таблетка (200 мг) после еды. Повторный прием не ранее чем через 4-6 часов.';
     let contraindications = 'Язвенная болезнь ЖКТ в фазе обострения, тяжелая почечная/печеночная недостаточность, III триместр беременности.';
     let warnings = 'Не превышать максимальную суточную дозу 1200 мг. Не сочетать с другими НПВП.';

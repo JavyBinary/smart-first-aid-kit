@@ -43,3 +43,5 @@ specs:
       status: done
     - name: 022-kit-health-profile-and-frontend-integration
       status: done
+    - name: 023-robust-chat-auth-and-llm-integration
+      status: done

@@ -178,6 +178,11 @@ class AuthService:
             raise UnauthorizedError()
         return user, claims
 
+    async def list_users(self) -> list[User]:
+        if hasattr(self._users, "list_all"):
+            return await self._users.list_all()
+        return []
+
     async def _issue_session(self, *, user: User, now: datetime) -> IssuedTokens:
         session_id = uuid4()
         family_id = uuid4()

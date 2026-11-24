@@ -13,6 +13,7 @@ from medai.auth.models import (
     LoginRequest,
     LoginTakenError,
     RegisterRequest,
+    Role,
     TooManyAttemptsError,
     UnauthorizedError,
     User,
@@ -200,5 +201,26 @@ def create_auth_router(auth_service: AuthService, config: AuthConfig) -> APIRout
             role=user.role,
             avatar_color=user.avatar_color,
         )
+
+    @router.get("/admin/users", response_model=list[UserResponse])
+    async def list_admin_users(
+        user: User = Depends(get_current_user),
+    ) -> list[UserResponse]:
+        if user.role not in (Role.ADMIN, Role.SUPERADMIN):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin privileges required",
+            )
+        all_users = await auth_service.list_users()
+        return [
+            UserResponse(
+                id=u.id,
+                email=u.email,
+                name=u.name,
+                role=u.role,
+                avatar_color=u.avatar_color,
+            )
+            for u in all_users
+        ]
 
     return router

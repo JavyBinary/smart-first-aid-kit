@@ -22,7 +22,7 @@ class AppStore {
 
     // Загрузка медкарты
     const savedHealth = localStorage.getItem('medai_health_profile');
-    let healthProfile = { allergies: ['Пенициллин'], chronic: ['Гастрит'] };
+    let healthProfile = { allergies: [], chronic: [] };
     if (savedHealth) {
       try {
         healthProfile = JSON.parse(savedHealth);

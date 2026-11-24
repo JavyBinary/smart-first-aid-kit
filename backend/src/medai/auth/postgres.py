@@ -44,6 +44,22 @@ class PostgresUserStore(UserStore):
                 password_hash=row["password_hash"],
             )
 
+    async def list_all(self) -> list[User]:
+        stmt = select(users).order_by(users.c.created_at.desc())
+        async with self._engine.connect() as conn:
+            result = await conn.execute(stmt)
+            rows = result.mappings().all()
+            return [
+                User(
+                    id=row["id"],
+                    email=row["email"],
+                    name=row["name"],
+                    role=Role(row["role"]),
+                    avatar_color=row["avatar_color"],
+                )
+                for row in rows
+            ]
+
     async def get_by_id(self, user_id: UUID) -> User | None:
         stmt = select(users).where(users.c.id == user_id)
         async with self._engine.connect() as conn:

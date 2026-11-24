@@ -9,6 +9,11 @@ from uuid import UUID
 
 from medai.dialogs.event_broker import DialogEventBroker
 from medai.dialogs.events import DialogEvent, DialogEventType, DialogSubscription
+from medai.dialogs.guardrails import (
+    OUT_OF_DOMAIN_RESPONSE,
+    is_emergency_query,
+    is_out_of_domain_query,
+)
 from medai.dialogs.history import (
     DialogNotFoundError,
     DialogSummary,
@@ -24,19 +29,6 @@ from medai.rag.models import SearchResult
 __all__ = ["DialogService"]
 
 logger = logging.getLogger(__name__)
-
-RED_FLAG_KEYWORDS = (
-    "ожог",
-    "ожоги",
-    "кипятком",
-    "кровотечение",
-    "потеря сознания",
-    "судороги",
-    "удушье",
-    "инфаркт",
-    "инсульт",
-    "анафилаксия",
-)
 
 EMERGENCY_RESPONSE_TEXT = (
     "Обнаружены признаки неотложного жизнеугрожающего состояния! "
@@ -150,12 +142,16 @@ class DialogService:
         await self._process_message(owner_id, dialog_id, content, include_kit_context)
 
     def _is_emergency(self, text: str) -> bool:
-        lowered = text.casefold()
-        return any(kw in lowered for kw in RED_FLAG_KEYWORDS)
+        return is_emergency_query(text)
 
-    def _synthesize_rag(self, query: str) -> tuple[str, list[dict[str, Any]], bool]:
-        if self._is_emergency(query):
+    def _synthesize_rag(
+        self, query: str, user_kit_names: list[str] | None = None
+    ) -> tuple[str, list[dict[str, Any]], bool]:
+        if is_emergency_query(query):
             return EMERGENCY_RESPONSE_TEXT, [], True
+
+        if is_out_of_domain_query(query):
+            return OUT_OF_DOMAIN_RESPONSE, [], False
 
         if not self._bm25_index:
             return (
@@ -163,6 +159,35 @@ class DialogService:
                 [],
                 False,
             )
+
+        # Check if query asks about a specific medicine attached or mentioned
+        if user_kit_names and self._bm25_index:
+            for kit_med in user_kit_names:
+                med_terms = self._analyzer.terms(kit_med)
+                matched = self._bm25_index.search(med_terms, top_k=1)
+                if matched and matched[0].score > 1.0:
+                    top_doc = matched[0].document
+                    sources = [
+                        {
+                            "doc_id": matched[0].doc_id,
+                            "title": matched[0].title,
+                            "bm25_score": matched[0].score,
+                        }
+                    ]
+                    indications_str = ", ".join(top_doc.indications[:3])
+                    contraindications_str = (
+                        ", ".join(top_doc.contraindications[:3])
+                        if top_doc.contraindications
+                        else "Не указаны"
+                    )
+                    full_text = (
+                        f"Препарат **{top_doc.title}** ({top_doc.inn}) — фармакотерапевтическая группа: {top_doc.category}.\n\n"
+                        f"**Показания к применению:** {indications_str}.\n"
+                        f"**Режим дозирования:** {top_doc.dosage}.\n"
+                        f"**Противопоказания:** {contraindications_str}.\n\n"
+                        f"*{DISCLAIMER_TEXT}*"
+                    )
+                    return full_text, sources, False
 
         terms = self._analyzer.terms(query)
         search_results: list[SearchResult] = self._bm25_index.search(terms, top_k=3)
@@ -280,7 +305,7 @@ class DialogService:
         self, query: str, user_kit_names: list[str] | None = None
     ) -> dict[str, Any]:
         """Synchronous query processor for legacy REST compatibility with /chat/query."""
-        if self._is_emergency(query):
+        if is_emergency_query(query):
             return {
                 "status": "emergency",
                 "emergency_mode": True,
@@ -295,18 +320,26 @@ class DialogService:
                 "disclaimer": DISCLAIMER_TEXT,
             }
 
-        full_text, sources, is_emergency = self._synthesize_rag(query)
+        if is_out_of_domain_query(query):
+            return {
+                "status": "out_of_domain",
+                "emergency_mode": False,
+                "message": OUT_OF_DOMAIN_RESPONSE,
+                "first_aid_steps": None,
+                "recommendation": None,
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
+
+        full_text, sources, is_emergency = self._synthesize_rag(
+            query, user_kit_names=user_kit_names
+        )
         if not sources:
             return {
                 "status": "success",
                 "emergency_mode": False,
-                "recommendation": {
-                    "medicine_name": "Не найдено",
-                    "in_user_kit": False,
-                    "dosage": "Нет данных",
-                    "contraindications": "Нет данных",
-                    "warnings": full_text,
-                },
+                "message": full_text,
+                "recommendation": None,
                 "sources": [],
                 "disclaimer": DISCLAIMER_TEXT,
             }
@@ -323,6 +356,7 @@ class DialogService:
         return {
             "status": "success",
             "emergency_mode": False,
+            "message": full_text,
             "recommendation": {
                 "medicine_name": med_name,
                 "in_user_kit": in_kit,

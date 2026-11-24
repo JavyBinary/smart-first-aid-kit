@@ -288,3 +288,25 @@ async def test_dialog_api_http_and_chat_query():
         data_rf = res_red_flag.json()
         assert data_rf["emergency_mode"] is True
         assert "112" in data_rf["message"]
+
+        # 9. Out-of-Domain Guardrail (e.g. blini)
+        res_blini = await client.post(
+            "/api/v1/chat/query",
+            json={"query": "как готовить тонкие блины на молоке?"},
+        )
+        assert res_blini.status_code == 200
+        data_blini = res_blini.json()
+        assert data_blini["status"] == "out_of_domain"
+        assert data_blini["recommendation"] is None
+        assert "кулинарн" in data_blini["message"]
+
+        # 10. Question about attached pill from kit
+        res_pill = await client.post(
+            "/api/v1/chat/query",
+            json={"query": "что это", "selected_pills": ["Парацетамол"]},
+        )
+        assert res_pill.status_code == 200
+        data_pill = res_pill.json()
+        assert data_pill["status"] == "success"
+        assert data_pill["recommendation"] is not None
+        assert "Парацетамол" in data_pill["recommendation"]["medicine_name"]

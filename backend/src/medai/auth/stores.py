@@ -16,6 +16,8 @@ class UserStore(Protocol):
 
     async def get_by_id(self, user_id: UUID) -> User | None: ...
 
+    async def list_all(self) -> list[User]: ...
+
     async def create(
         self,
         id: UUID,

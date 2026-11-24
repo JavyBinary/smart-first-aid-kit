@@ -4,6 +4,7 @@
 
 import { store } from './state/store.js';
 import { kitApi } from './api/kit.api.js';
+import { authApi } from './api/auth.api.js';
 import { AmbientBackground } from './components/AmbientBackground.js';
 import { Catalog } from './components/Catalog.js';
 import { Chat } from './components/Chat.js';
@@ -248,6 +249,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Применяем профиль немедленно при загрузке
   applyUserProfile(store.getState().user);
+
+  // Валидируем и восстанавливаем реальную сессию с бэкенда по cookie
+  authApi.getMe().then(me => {
+    if (me && me.id) {
+      store.state.user = {
+        name: me.name,
+        email: me.email,
+        role: me.role,
+        avatar: ''
+      };
+      localStorage.setItem('medai_user', me.email);
+      localStorage.setItem('medai_name', me.name);
+      localStorage.setItem('medai_role', me.role);
+      applyUserProfile(store.getState().user);
+    }
+  }).catch(() => {});
 
   store.subscribe('user:updated', (user) => {
     applyUserProfile(user);

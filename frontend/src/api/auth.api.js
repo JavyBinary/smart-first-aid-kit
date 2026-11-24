@@ -1,13 +1,30 @@
 import { request } from './client.js';
 
 export const authApi = {
+  async getMe() {
+    const res = await request('/auth/me');
+    if (!res._fallback && res.id) {
+      return res;
+    }
+    return null;
+  },
+
+  async getAdminUsers() {
+    const res = await request('/auth/admin/users');
+    if (!res._fallback && Array.isArray(res)) {
+      return res;
+    }
+    return null;
+  },
+
   async login(email, password) {
     const res = await request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    if (!res._fallback && res.token) {
-      return res;
+    if (!res._fallback && (res.id || res.user || res.token)) {
+      const user = res.user || res;
+      return { token: 'session-cookie', user };
     }
     // Локальный fallback режим с поддержкой superadmin и admin
     const cleanEmail = email.trim().toLowerCase();
@@ -37,8 +54,9 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ name, email, password })
     });
-    if (!res._fallback && res.token) {
-      return res;
+    if (!res._fallback && (res.id || res.user || res.token)) {
+      const user = res.user || res;
+      return { token: 'session-cookie', user };
     }
     const cleanEmail = email.trim().toLowerCase();
     let role = 'user';

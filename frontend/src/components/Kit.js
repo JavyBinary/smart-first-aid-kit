@@ -248,8 +248,8 @@ export class Kit {
     if (!medcardMount) return;
 
     const profile = store.getState().healthProfile || {
-      allergies: ['Пенициллин'],
-      chronic: ['Гастрит'],
+      allergies: [],
+      chronic: [],
       age: 'Взрослый',
       weight: 70,
       notes: []

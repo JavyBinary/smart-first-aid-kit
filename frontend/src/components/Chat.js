@@ -76,29 +76,44 @@ export class Chat {
     // 2. Статус маскота «думает»
     store.setMascotState('thinking');
 
-    // 3. Запрос
-    const response = await chatApi.sendQuery(text, state.kitItems, selectedPills);
+    try {
+      // 3. Запрос
+      const response = await chatApi.sendQuery(text, state.kitItems, selectedPills);
 
-    // 4. Проверка Red Flags
-    if (response.emergency_mode) {
-      store.setMascotState('emergency');
+      // 4. Проверка Red Flags
+      if (response && response.emergency_mode) {
+        store.setMascotState('emergency');
+        store.addMessageToActiveSession({
+          id: `msg_${Date.now()}_bot`,
+          sender: 'bot',
+          isEmergency: true,
+          data: response
+        });
+        return;
+      }
+
+      // 5. Обычный ответ (RAG, Guardrail или справка)
+      store.setMascotState('idle');
       store.addMessageToActiveSession({
         id: `msg_${Date.now()}_bot`,
         sender: 'bot',
-        isEmergency: true,
-        data: response
+        isEmergency: false,
+        data: response || { message: 'Запрос успешно обработан.' }
       });
-      return;
+    } catch (err) {
+      store.setMascotState('idle');
+      store.addMessageToActiveSession({
+        id: `msg_${Date.now()}_bot`,
+        sender: 'bot',
+        isEmergency: false,
+        data: {
+          message: 'Произошла непредвиденная ошибка при обращении к сервису. Пожалуйста, повторите запрос.'
+        }
+      });
+    } finally {
+      store.setMascotState('idle');
+      if (sendBtn) sendBtn.disabled = false;
     }
-
-    // 5. Обычный RAG-ответ
-    store.setMascotState('idle');
-    store.addMessageToActiveSession({
-      id: `msg_${Date.now()}_bot`,
-      sender: 'bot',
-      isEmergency: false,
-      data: response
-    });
   }
 
   renderSelectedPills() {
@@ -200,7 +215,21 @@ export class Chat {
         `;
       }
 
-      const rec = msg.data.recommendation;
+      const rec = msg.data ? msg.data.recommendation : null;
+      if (!rec || !rec.medicine_name) {
+        const textContent = (msg.data && msg.data.message) || msg.text || 'Ответ сформирован.';
+        return `
+          <div class="message-row bot">
+            <div class="message-bubble">
+              <div style="font-size: 14.5px; line-height: 1.6; color: #181C20; white-space: pre-wrap;">
+                ${textContent}
+              </div>
+              ${msg.data && msg.data.disclaimer ? `<div style="font-size: 11px; margin-top: 8px; opacity: 0.8; color: #6B7280;">${msg.data.disclaimer}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="message-row bot">
           <div class="message-bubble">
@@ -228,8 +257,8 @@ export class Chat {
               </div>
 
               <div class="rag-meta-footer">
-                <div>Источник: ${msg.data.sources ? msg.data.sources[0].title : 'Официальная инструкция Минздрава РФ'}</div>
-                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${msg.data.disclaimer}</div>
+                <div>Источник: ${msg.data.sources && msg.data.sources.length ? msg.data.sources[0].title : 'Официальная инструкция Минздрава РФ'}</div>
+                <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">${msg.data.disclaimer || ''}</div>
               </div>
             </div>
           </div>

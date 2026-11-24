@@ -464,6 +464,7 @@
   <script type="module">
     import { AmbientBackground } from './src/components/AmbientBackground.js';
     import { CATALOG_DATABASE } from './src/components/Catalog.js';
+    import { authApi } from './src/api/auth.api.js';
 
     // 0. Кнопка выхода из панели администратора
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
@@ -678,8 +679,28 @@
 
     document.getElementById('adminCatalogSearch').addEventListener('input', renderCatalogTable);
 
+    async function loadAdminUsers() {
+      try {
+        const realUsers = await authApi.getAdminUsers();
+        if (realUsers && realUsers.length) {
+          users = realUsers.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            medcard: 'Профиль активен',
+            kitCount: 0
+          }));
+          renderUsersTable();
+        }
+      } catch (e) {
+        // pass
+      }
+    }
+
     renderCatalogTable();
     renderUsersTable();
+    loadAdminUsers();
   </script>
 </body>
 </html>

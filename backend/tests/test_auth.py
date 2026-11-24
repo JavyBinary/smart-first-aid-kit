@@ -19,6 +19,7 @@ from medai.auth.models import (
 )
 from medai.auth.passwords import Argon2PasswordHasher
 from medai.auth.rate_limiter import InMemoryRateLimiter
+from medai.auth.router import get_current_user
 from medai.auth.service import AuthService
 from medai.auth.stores import SessionStore, UserStore
 from medai.auth.tokens import TokenCodec
@@ -37,6 +38,9 @@ class InMemoryUserStore(UserStore):
 
     async def get_by_id(self, user_id: UUID) -> User | None:
         return self.users_by_id.get(user_id)
+
+    async def list_all(self) -> list[User]:
+        return list(self.users_by_id.values())
 
     async def create(
         self,
@@ -329,6 +333,60 @@ async def test_auth_api_endpoints() -> None:
         client.cookies.clear()
         me_fail = await client.get("/api/v1/auth/me")
         assert me_fail.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_admin_users_api() -> None:
+    config = AuthConfig(
+        jwt_secret="test_secret_key_at_least_32_characters_long",
+        access_ttl_seconds=300,
+        refresh_ttl_seconds=3600,
+    )
+    users = InMemoryUserStore()
+    sessions = InMemorySessionStore()
+    hasher = Argon2PasswordHasher()
+    tokens = TokenCodec(config)
+    limiter = InMemoryRateLimiter(config.rate_limit)
+
+    service = AuthService(
+        config=config,
+        users=users,
+        sessions=sessions,
+        hasher=hasher,
+        tokens=tokens,
+        limiter=limiter,
+    )
+    app = create_app(auth_service=service)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        # Register user
+        reg_user = await client.post(
+            "/api/v1/auth/register",
+            json={"email": "regular@medai.ru", "password": "Password123!", "name": "Обычный"},
+        )
+        assert reg_user.status_code == 200
+
+        # Regular user tries to access /admin/users -> 403 Forbidden
+        res_forbidden = await client.get("/api/v1/auth/admin/users")
+        assert res_forbidden.status_code == 403
+
+        # Override user with admin role
+        admin_user = User(
+            id=uuid4(),
+            email="admin@medai.ru",
+            name="Админ",
+            role=Role.ADMIN,
+            avatar_color="#2563EB",
+        )
+        app.dependency_overrides[get_current_user] = lambda: admin_user
+
+        res_admin = await client.get("/api/v1/auth/admin/users")
+        assert res_admin.status_code == 200
+        user_list = res_admin.json()
+        assert len(user_list) >= 1
+        assert any(u["email"] == "regular@medai.ru" for u in user_list)
 
 
 @pytest.mark.asyncio
