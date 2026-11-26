@@ -50,7 +50,7 @@ services:
     command:
       - sh
       - -c
-      - "python -m medai.db.migrate && python -m medai.rag load"
+      - "python -m medai.db.migrate && python -m medai.rag load data/medicines"
     restart: "no"
 
   backend:
