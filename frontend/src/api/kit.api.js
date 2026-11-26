@@ -46,10 +46,12 @@ export const kitApi = {
 
     async addItem(item) {
         const payload = serializeCreateKitItem(item);
-        return request('/kit/items', {
+        const res = await request('/kit/items', {
             method: 'POST',
             body: JSON.stringify(payload),
         });
+        if (res && res.item) return res.item;
+        return res;
     },
 
     async updateItem(id, updates) {
