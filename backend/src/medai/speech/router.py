@@ -50,26 +50,37 @@ def _clean_for_tts(raw_text: str) -> str:
 
 
 async def _render_mp3(text: str, voice_id: str) -> bytes:
+    import asyncio
+
     import edge_tts
 
     clean_text = _clean_for_tts(text)
     if not clean_text:
         clean_text = "Рекомендация сформирована."
     neural_voice, rate, pitch = VOICE_PROFILES[voice_id]
-    comm = edge_tts.Communicate(
-        clean_text,
-        voice=neural_voice,
-        rate=rate,
-        pitch=pitch,
-    )
-    chunks: list[bytes] = []
-    async for chunk in comm.stream():
-        if chunk.get("type") == "audio":
-            chunks.append(bytes(chunk["data"]))
-    audio = b"".join(chunks)
-    if not audio:
-        raise RuntimeError("Empty audio stream returned by TTS engine")
-    return audio
+    kwargs: dict[str, str] = {}
+    if rate != "+0%":
+        kwargs["rate"] = rate
+    if pitch != "+0Hz":
+        kwargs["pitch"] = pitch
+
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            comm = edge_tts.Communicate(clean_text, voice=neural_voice, **kwargs)
+            chunks: list[bytes] = []
+            async for chunk in comm.stream():
+                if chunk.get("type") == "audio":
+                    chunks.append(bytes(chunk["data"]))
+            audio = b"".join(chunks)
+            if audio:
+                return audio
+        except Exception as err:
+            last_err = err
+        if attempt == 0:
+            await asyncio.sleep(0.35)
+
+    raise RuntimeError("Empty audio stream returned by TTS engine") from last_err
 
 
 def create_speech_router(dialog_service: DialogService) -> APIRouter:
