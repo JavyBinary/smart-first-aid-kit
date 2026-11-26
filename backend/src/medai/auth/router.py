@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from medai.auth.models import (
     AuthResult,
+    ChangePasswordRequest,
     InvalidCredentialsError,
     IssuedTokens,
     LoginRequest,
     LoginTakenError,
     RegisterRequest,
     Role,
+    RoleUpdateRequest,
     TooManyAttemptsError,
     UnauthorizedError,
     User,
@@ -22,7 +25,7 @@ from medai.auth.models import (
 from medai.auth.service import AuthService
 from medai.config import AuthConfig
 
-__all__ = ["create_auth_router", "get_current_user"]
+__all__ = ["create_auth_router", "get_current_user", "get_optional_user"]
 
 
 def _get_client_ip(request: Request) -> str:
@@ -84,6 +87,25 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         ) from err
+
+
+async def get_optional_user(
+    request: Request,
+    access_token: Annotated[str | None, Cookie()] = None,
+) -> User | None:
+    auth_service: AuthService = request.app.state.auth_service
+    token = access_token
+    if not token:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token = auth_header[7:].strip()
+    if not token:
+        return None
+    try:
+        user, _ = await auth_service.authenticate(token)
+        return user
+    except UnauthorizedError:
+        return None
 
 
 def create_auth_router(auth_service: AuthService, config: AuthConfig) -> APIRouter:
@@ -186,11 +208,43 @@ def create_auth_router(auth_service: AuthService, config: AuthConfig) -> APIRout
     async def logout(
         response: Response,
         refresh_token: Annotated[str | None, Cookie()] = None,
+        access_token: Annotated[str | None, Cookie()] = None,
     ) -> dict[str, str]:
-        if refresh_token:
-            await auth_service.logout(refresh_token=refresh_token)
+        await auth_service.logout(
+            refresh_token=refresh_token, access_token=access_token
+        )
         clear_auth_cookies(response)
         return {"status": "logged_out"}
+
+    @router.post("/change-password")
+    async def change_password(
+        payload: ChangePasswordRequest,
+        response: Response,
+        user: User = Depends(get_current_user),
+        access_token: Annotated[str | None, Cookie()] = None,
+    ) -> dict[str, str]:
+        jti: str | None = None
+        if access_token:
+            try:
+                _, claims = await auth_service.authenticate(access_token)
+                jti = claims.jti
+            except UnauthorizedError:
+                pass
+        try:
+            await auth_service.change_password(
+                user_id=user.id,
+                old_password=payload.old_password,
+                new_password=payload.new_password,
+                access_jti=jti,
+                access_ttl_seconds=config.access_ttl_seconds,
+            )
+        except InvalidCredentialsError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Текущий пароль указан неверно.",
+            )
+        clear_auth_cookies(response)
+        return {"status": "success", "message": "Пароль успешно обновлен"}
 
     @router.get("/me", response_model=UserResponse)
     async def me(user: User = Depends(get_current_user)) -> UserResponse:
@@ -222,5 +276,47 @@ def create_auth_router(auth_service: AuthService, config: AuthConfig) -> APIRout
             )
             for u in all_users
         ]
+
+    @router.patch("/admin/users/{user_id}/role", response_model=UserResponse)
+    async def update_user_role(
+        user_id: UUID,
+        payload: RoleUpdateRequest,
+        user: User = Depends(get_current_user),
+    ) -> UserResponse:
+        if user.role not in (Role.ADMIN, Role.SUPERADMIN):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin privileges required",
+            )
+        if payload.role == Role.SUPERADMIN and user.role != Role.SUPERADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only superadmin can assign superadmin role",
+            )
+        all_users = await auth_service.list_users()
+        target = next((u for u in all_users if u.id == user_id), None)
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        if target.role == Role.SUPERADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot modify superadmin role",
+            )
+        updated = await auth_service.update_user_role(
+            target_user_id=user_id, new_role=payload.role
+        )
+        if updated is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        return UserResponse(
+            id=updated.id,
+            email=updated.email,
+            name=updated.name,
+            role=updated.role,
+            avatar_color=updated.avatar_color,
+        )
 
     return router

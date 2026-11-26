@@ -290,12 +290,14 @@ export class Catalog {
       dosage: med.dosage,
       form: med.form,
       category: med.category,
-      tags: med.tags,
-      expiry: med.expiry
+      tags: Array.isArray(med.tags) ? med.tags : [],
+      quantity: 1,
+      status: med.status === 'rx' || med.isPrescription ? 'rx' : 'otc',
+      expiry: med.expiry || '2027-12-31'
     };
 
-    await kitApi.addItem(newItem);
-    store.addKitItem(newItem);
+    const saved = await kitApi.addItem(newItem);
+    store.addKitItem(saved && saved.id ? saved : newItem);
     store.setMascotState('happy');
     setTimeout(() => store.setMascotState('idle'), 2500);
 

@@ -38,6 +38,21 @@ services:
       timeout: 3s
       retries: 12
 
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      <<: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - "python -m medai.db.migrate && python -m medai.rag load"
+    restart: "no"
+
   backend:
     build:
       context: ..
@@ -51,6 +66,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     init: true
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2)"]

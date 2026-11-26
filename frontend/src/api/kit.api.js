@@ -1,49 +1,68 @@
 import { request } from './client.js';
 
-const KIT_STORAGE_KEY = 'medai_kit';
+/**
+ * Приводит объект препарата из UI к строгой Pydantic-схеме CreateKitItemRequest (extra="forbid").
+ */
+export function serializeCreateKitItem(item) {
+    const rawStatus = item.status || (item.isPrescription || item.is_prescription ? 'rx' : 'otc');
+    const tags = Array.isArray(item.tags)
+        ? item.tags.map((t) => String(t).trim()).filter(Boolean)
+        : [];
+    const payload = {
+        name: String(item.name || '').trim(),
+        dosage: String(item.dosage || '').trim(),
+        form: String(item.form || 'таблетки').trim() || 'таблетки',
+        category: String(item.category || 'Пользовательское').trim() || 'Пользовательское',
+        tags,
+        quantity: Math.max(1, Number.parseInt(item.quantity, 10) || 1),
+        expiry: String(item.expiry || '').trim() || '2027-12-31',
+        status: rawStatus === 'rx' ? 'rx' : 'otc',
+    };
+    if (item.id && !String(item.id).startsWith('local-')) {
+        payload.id = String(item.id);
+    }
+    return payload;
+}
+
+export function serializeUpdateKitItem(updates) {
+    const payload = {};
+    if (updates.dosage !== undefined) payload.dosage = String(updates.dosage).trim();
+    if (updates.quantity !== undefined) payload.quantity = Math.max(1, Number.parseInt(updates.quantity, 10) || 1);
+    if (updates.expiry !== undefined) payload.expiry = String(updates.expiry).trim();
+    if (updates.status !== undefined) {
+        payload.status = updates.status === 'rx' ? 'rx' : 'otc';
+    } else if (updates.isPrescription !== undefined || updates.is_prescription !== undefined) {
+        payload.status = updates.isPrescription || updates.is_prescription ? 'rx' : 'otc';
+    }
+    return payload;
+}
 
 export const kitApi = {
-  async getItems() {
-    const res = await request('/kit');
-    if (!res._fallback && Array.isArray(res.items)) {
-      return res.items;
-    }
-    // Fallback на localStorage
-    const saved = localStorage.getItem(KIT_STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // pass
-      }
-    }
-    return [];
-  },
+    async getItems() {
+        const res = await request('/kit');
+        if (res._fallback || res._status >= 400) return res;
+        return Array.isArray(res.items) ? res.items : [];
+    },
 
-  async addItem(item) {
-    const newItem = {
-      id: item.id || `kit_${Date.now()}`,
-      expiry: item.expiry || '2027-12-31',
-      ...item
-    };
-    // Синхронизация с бэкендом
-    request('/kit/items', {
-      method: 'POST',
-      body: JSON.stringify(newItem)
-    }).catch(() => {});
+    async addItem(item) {
+        const payload = serializeCreateKitItem(item);
+        return request('/kit/items', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
 
-    // Локальное обновление
-    const items = await this.getItems();
-    items.unshift(newItem);
-    localStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(items));
-    return newItem;
-  },
+    async updateItem(id, updates) {
+        const payload = serializeUpdateKitItem(updates);
+        return request(`/kit/items/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    },
 
-  async deleteItem(id) {
-    request(`/kit/items/${id}`, { method: 'DELETE' }).catch(() => {});
-    const items = await this.getItems();
-    const updated = items.filter(item => item.id !== id);
-    localStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(updated));
-    return true;
-  }
+    async deleteItem(id) {
+        return request(`/kit/items/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+        });
+    },
 };

@@ -5,6 +5,7 @@
  */
 
 import { store } from '../state/store.js';
+import { authApi } from '../api/auth.api.js';
 
 export class AccountProfileModal {
   constructor(overlayElement) {
@@ -126,8 +127,23 @@ export class AccountProfileModal {
           </div>
 
           <div>
-            <label class="modal-label">Новый пароль (оставьте пустым, если не меняете)</label>
-            <input type="password" id="accUserPassword" class="modal-input" placeholder="Минимум 6 символов">
+            <label class="modal-label">Голос озвучивания (TTS)</label>
+            <select id="accVoiceSelect" class="modal-input">
+              <option value="baya" ${store.getState().voice === 'baya' ? 'selected' : ''}>Baya (женский, мягкий)</option>
+              <option value="kseniya" ${store.getState().voice === 'kseniya' ? 'selected' : ''}>Kseniya (женский, чёткий)</option>
+              <option value="aidar" ${store.getState().voice === 'aidar' ? 'selected' : ''}>Aidar (мужской)</option>
+              <option value="eugene" ${store.getState().voice === 'eugene' ? 'selected' : ''}>Eugene (мужской)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="modal-label">Текущий пароль (для смены пароля)</label>
+            <input type="password" id="accOldPassword" class="modal-input" placeholder="Оставьте пустым, если пароль не меняется">
+          </div>
+
+          <div>
+            <label class="modal-label">Новый пароль (минимум 8 символов)</label>
+            <input type="password" id="accUserPassword" class="modal-input" placeholder="Новый пароль">
           </div>
 
           <div id="accountModalAlert" style="display: none; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; background: #E8F7F0; color: #00875A;">
@@ -207,10 +223,46 @@ export class AccountProfileModal {
     }
 
     const form = this.overlay.querySelector('#accountProfileForm');
-    form.onsubmit = (e) => {
+    form.onsubmit = async (e) => {
       e.preventDefault();
       const newName = this.overlay.querySelector('#accUserName').value.trim();
       const newEmail = this.overlay.querySelector('#accUserEmail').value.trim();
+      const oldPwd = (this.overlay.querySelector('#accOldPassword')?.value || '').trim();
+      const newPwd = (this.overlay.querySelector('#accUserPassword')?.value || '').trim();
+      const voiceSel = this.overlay.querySelector('#accVoiceSelect')?.value || 'baya';
+      const alertBox = this.overlay.querySelector('#accountModalAlert');
+
+      store.setVoice(voiceSel);
+
+      if (newPwd) {
+        if (!oldPwd) {
+          if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#FEF2F2';
+            alertBox.style.color = '#B91C1C';
+            alertBox.textContent = 'Укажите текущий пароль для смены пароля';
+          }
+          return;
+        }
+        const pwdRes = await authApi.changePassword(oldPwd, newPwd);
+        if (pwdRes._status >= 400 || pwdRes._error) {
+          if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#FEF2F2';
+            alertBox.style.color = '#B91C1C';
+            alertBox.textContent = pwdRes._error || 'Не удалось сменить пароль';
+          }
+          return;
+        }
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#E8F7F0';
+          alertBox.style.color = '#00875A';
+          alertBox.textContent = 'Пароль обновлён. Требуется повторный вход...';
+        }
+        setTimeout(() => store.logout(), 900);
+        return;
+      }
 
       if (newName) {
         store.setUser({
@@ -219,8 +271,12 @@ export class AccountProfileModal {
           avatar: this.selectedAvatar
         });
 
-        const alertBox = this.overlay.querySelector('#accountModalAlert');
-        if (alertBox) alertBox.style.display = 'block';
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#E8F7F0';
+          alertBox.style.color = '#00875A';
+          alertBox.textContent = 'Данные профиля успешно обновлены';
+        }
 
         setTimeout(() => this.close(), 700);
       }

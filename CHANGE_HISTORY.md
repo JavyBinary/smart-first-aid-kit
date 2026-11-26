@@ -4,6 +4,25 @@
 
 ---
 
+## [0.5.0-kt2-hybrid-agent-admin] — 2026-11-26
+### Гибридный RAG в PostgreSQL, Agent Runtime (LiteLLM), Redis Security и Admin 2.0 (Ветка: feat/kt2-backend-rag)
+
+#### Добавлено и улучшено:
+- **PostgreSQL RAG, гибридный поиск и честный бенчмарк (SDD 024):**
+  - Миграция `0002_rag_hybrid_feedback_admin.py`: расширение `user_kits.tags`, включение `pg_trgm` + GIN-индексов, таблицы `rag_chunks`, `rag_terms`, `rag_postings`, `rag_stats`, `rag_loads`, `rag_revisions`, `message_feedback`, `message_reports`, `message_audio`.
+  - Контекстное структурированное чанкирование (`chunking.py`), расширение синонимами + плотные эмбеддинги + RRF (`embeddings.py`, `hybrid.py`), Set-based PostgreSQL хранилище (`rag/postgres.py`), CLI `medai.rag` (`check/load/export/delete/restore/search/benchmark`).
+  - Исправлен баг отсечения вопросов-ловушек в `benchmark.py`, добавлены `Context Precision`, `Accuracy`, `Faithfulness` (`benchmark_llm.py`) и абляционный анализ `BM25 vs Dense vs Hybrid` на 30 запросах.
+- **Agent Runtime, LiteLLM и медицинская безопасность (SDD 025):**
+  - Асинхронный streaming-провайдер `LiteLLMProvider` и цикл `Agent` + `ToolRegistry` (`backend/src/medai/agent/`), версионированный `prompts/system.md`.
+  - Инструменты безопасности `medical_tools.py`: `search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions` (проверка аллергий, гастрита/язвы, дублей МНН, просрочки и возраста).
+  - Двухслойная защита `guardrails.py`: детекция Prompt Injection (`detect_prompt_injection`), Red Flags (`112`), Out-of-Domain и Output Grounding (`verify_output_grounding`), а также интеллектуальный детерминированный fallback при отсутствии `LLM_API_KEY`.
+- **Сквозная интеграция, Redis, CSRF, TTS и Admin 2.0 (SDD 026):**
+  - `RedisRateLimiter`, `RedisTokenBlacklist` (`cache/`), `ForbiddenOriginMiddleware` (`security.py`), `POST /auth/change-password`, `PATCH /auth/admin/users/{id}/role`.
+  - Эндпоинты `/api/v1/admin/*` (статистика 7/30/90, модерация жалоб, CRUD корпуса лекарств, живой benchmark) и `/api/v1/dialogs/.../audio`.
+  - Полная синхронизация SPA (`frontend/src/`): auto-refresh на `401`, честные `4xx`, сериализация аптечки (`tags`, `status`) и медкарты (`/profile`), SSE-стриминг диалогов, оценки `1..5`, жалобы, озвучка, подсказки-чипсы, глубина ответа, аудит и экспорт памятки аптечки, таймер ожога и живая панель администратора (`frontend/admin.html`, `frontend/src/admin.js`).
+
+---
+
 ## [0.4.1-robust-chat-and-auth] — 2026-11-24
 ### Устойчивый диалог, Guardrails, Cookie-аутентификация и чистые профили (Ветка: feat/kt2-backend-rag)
 

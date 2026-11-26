@@ -1,4 +1,4 @@
-"""Dialog application service coordinating history, BM25 RAG, and streaming events."""
+"""Dialog application service coordinating Agent/LLM, Hybrid RAG, safety checks, and SSE."""
 
 from __future__ import annotations
 
@@ -7,24 +7,50 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from medai.agent import (
+    Agent,
+    AgentConfig,
+    AgentResponse,
+    AgentTextDelta,
+    LLMProvider,
+    Message,
+    MessageRole,
+    ToolRegistry,
+    UserRequest,
+    load_system_prompt,
+)
+from medai.agent.medical_tools import (
+    CheckInteractionsTool,
+    GetSafetyProfileTool,
+    LookupMedicineTool,
+    SearchMedicinesTool,
+    analyze_medicine_safety,
+)
 from medai.dialogs.event_broker import DialogEventBroker
 from medai.dialogs.events import DialogEvent, DialogEventType, DialogSubscription
 from medai.dialogs.guardrails import (
     OUT_OF_DOMAIN_RESPONSE,
+    PROMPT_INJECTION_RESPONSE,
+    detect_prompt_injection,
     is_emergency_query,
     is_out_of_domain_query,
+    verify_output_grounding,
 )
 from medai.dialogs.history import (
     DialogNotFoundError,
     DialogSummary,
     DialogTranscript,
     HistoryStore,
+    ReportNewsItem,
     make_title,
 )
+from medai.kit.stores import KitStore
 from medai.observability import log_event
-from medai.rag.analyzer import MorphAnalyzer, TextAnalyzer
+from medai.profile.stores import ProfileStore
+from medai.rag.analyzer import MorphAnalyzer, TextAnalyzer, normalize_text
+from medai.rag.hybrid import HybridRagIndex
 from medai.rag.index import InMemoryBm25Index
-from medai.rag.models import SearchResult
+from medai.rag.models import MedicineDocument, SearchResult
 
 __all__ = ["DialogService"]
 
@@ -42,6 +68,13 @@ EMERGENCY_RESPONSE_TEXT = (
     "5. Контролируйте дыхание и пульс до прибытия врачей."
 )
 
+EMERGENCY_STEPS = [
+    "Немедленно наберите номер службы спасения 112 или 103.",
+    "При термическом ожоге: охлаждайте зону проточной прохладной водой 15 минут.",
+    "Категорически запрещено наносить масла, спирт, мази или прокалывать пузыри.",
+    "Обеспечьте покой и контролируйте дыхание пострадавшего до прибытия медиков.",
+]
+
 DISCLAIMER_TEXT = (
     "Информация носит ознакомительный доврачебный характер. "
     "При сохранении симптомов свыше 2 дней обратитесь к врачу."
@@ -55,13 +88,39 @@ class DialogService:
         event_broker: DialogEventBroker,
         bm25_index: InMemoryBm25Index | None = None,
         analyzer: TextAnalyzer | None = None,
+        *,
+        hybrid_index: HybridRagIndex | None = None,
+        llm_provider: LLMProvider | None = None,
+        kit_store: KitStore | None = None,
+        profile_store: ProfileStore | None = None,
     ) -> None:
         self._history = history_store
         self._broker = event_broker
-        self._bm25_index = bm25_index
         self._analyzer = MorphAnalyzer() if analyzer is None else analyzer
+        self._bm25_index = bm25_index
+        if hybrid_index is not None:
+            self._hybrid_index: HybridRagIndex | None = hybrid_index
+        elif bm25_index is not None:
+            self._hybrid_index = HybridRagIndex(bm25_index, analyzer=self._analyzer)
+        else:
+            self._hybrid_index = None
+
+        self._llm_provider = llm_provider
+        self._kit_store = kit_store
+        self._profile_store = profile_store
+        self._system_prompt = load_system_prompt()
         self._dialog_chains: dict[UUID, asyncio.Task[None]] = {}
         self._lock = asyncio.Lock()
+
+    def set_rag_index(self, bm25_index: InMemoryBm25Index) -> None:
+        """Hot-swap the active RAG index after admin edits or corpus reload."""
+        self._bm25_index = bm25_index
+        self._hybrid_index = HybridRagIndex(bm25_index, analyzer=self._analyzer)
+
+    def _can_use_llm(self) -> bool:
+        if self._llm_provider is None:
+            return False
+        return getattr(self._llm_provider, "is_configured", True)
 
     async def start_dialog(self, owner_id: UUID) -> UUID:
         dialog_id = await self._history.create_dialog(owner_id)
@@ -95,8 +154,37 @@ class DialogService:
             user_id=str(owner_id),
         )
 
+    async def set_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int, score: int
+    ) -> None:
+        await self._history.set_feedback(owner_id, dialog_id, message_id, score)
+
+    async def clear_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int
+    ) -> None:
+        await self._history.clear_feedback(owner_id, dialog_id, message_id)
+
+    async def report(
+        self,
+        owner_id: UUID,
+        dialog_id: UUID,
+        message_id: int,
+        reason: str,
+        comment: str | None = None,
+    ) -> int:
+        return await self._history.create_report(
+            owner_id, dialog_id, message_id, reason, comment
+        )
+
+    async def report_news(self, owner_id: UUID) -> list[ReportNewsItem]:
+        return await self._history.list_report_news(owner_id)
+
+    async def mark_report_news_seen(
+        self, owner_id: UUID, report_ids: list[int]
+    ) -> None:
+        await self._history.mark_report_news_seen(owner_id, report_ids)
+
     async def subscribe(self, owner_id: UUID, dialog_id: UUID) -> DialogSubscription:
-        # Validate ownership
         await self._history.get_transcript(owner_id, dialog_id)
         return await self._broker.subscribe(dialog_id)
 
@@ -109,8 +197,9 @@ class DialogService:
         dialog_id: UUID,
         content: str,
         include_kit_context: bool = True,
+        selected_pills: list[str] | None = None,
+        response_depth: str = "detailed",
     ) -> None:
-        # Ensure dialog exists and is owned by caller
         await self._history.get_transcript(owner_id, dialog_id)
 
         async with self._lock:
@@ -122,6 +211,8 @@ class DialogService:
                     dialog_id,
                     content,
                     include_kit_context,
+                    list(selected_pills or []),
+                    response_depth,
                 )
             )
             self._dialog_chains[dialog_id] = task
@@ -133,99 +224,329 @@ class DialogService:
         dialog_id: UUID,
         content: str,
         include_kit_context: bool,
+        selected_pills: list[str],
+        response_depth: str,
     ) -> None:
         if prev_task is not None:
             try:
                 await prev_task
             except Exception:
                 pass
-        await self._process_message(owner_id, dialog_id, content, include_kit_context)
+        await self._process_message(
+            owner_id,
+            dialog_id,
+            content,
+            include_kit_context,
+            selected_pills,
+            response_depth,
+        )
 
-    def _is_emergency(self, text: str) -> bool:
-        return is_emergency_query(text)
+    async def _load_user_safety_snapshot(
+        self,
+        owner_id: UUID | None,
+        *,
+        kit_names_override: list[str] | None = None,
+        health_override: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        kit_items: list[dict[str, Any]] = []
+        health_profile: dict[str, Any] = dict(health_override or {})
+
+        if owner_id is not None:
+            if self._kit_store is not None:
+                try:
+                    stored_items = await self._kit_store.list_items(owner_id)
+                    kit_items = [
+                        {
+                            "name": it.name,
+                            "dosage": it.dosage,
+                            "expiry": it.expiry,
+                            "is_expired": it.is_expired,
+                        }
+                        for it in stored_items
+                    ]
+                except Exception:
+                    logger.warning("Failed to load user kit for %s", owner_id)
+            if self._profile_store is not None and not health_profile:
+                try:
+                    prof = await self._profile_store.get_profile(owner_id)
+                    health_profile = prof.model_dump()
+                except Exception:
+                    logger.warning("Failed to load health profile for %s", owner_id)
+
+        if not kit_items and kit_names_override:
+            kit_items = [{"name": n, "is_expired": False} for n in kit_names_override if n]
+
+        return {
+            "kit_items": kit_items,
+            "kit_names": [it["name"] for it in kit_items],
+            "health_profile": health_profile,
+        }
+
+    def _find_docs_for_pills(self, pill_names: list[str]) -> list[SearchResult]:
+        if not self._hybrid_index or not pill_names:
+            return []
+        found: list[SearchResult] = []
+        seen_ids: set[str] = set()
+        for name in pill_names:
+            q = normalize_text(name)
+            matched_docs = [
+                d
+                for d in self._hybrid_index.documents.values()
+                if q in normalize_text(d.title) or q in normalize_text(d.inn)
+            ]
+            if not matched_docs:
+                matched_docs = self._hybrid_index.suggest_fuzzy(
+                    name, threshold=0.25, limit=1
+                )
+            for doc in matched_docs[:1]:
+                if doc.id not in seen_ids:
+                    seen_ids.add(doc.id)
+                    found.append(
+                        SearchResult(
+                            doc_id=doc.id,
+                            title=doc.title,
+                            score=10.0,
+                            document=doc,
+                        )
+                    )
+        return found
 
     def _synthesize_rag(
-        self, query: str, user_kit_names: list[str] | None = None
-    ) -> tuple[str, list[dict[str, Any]], bool]:
+        self,
+        query: str,
+        user_kit_names: list[str] | None = None,
+        *,
+        selected_pills: list[str] | None = None,
+        health_profile: dict[str, Any] | None = None,
+        kit_items: list[dict[str, Any]] | None = None,
+        response_depth: str = "detailed",
+    ) -> dict[str, Any]:
+        """Deterministic safety-aware RAG synthesis (used as fallback and card builder)."""
+        if detect_prompt_injection(query):
+            return {
+                "status": "injection_blocked",
+                "emergency_mode": False,
+                "message": PROMPT_INJECTION_RESPONSE,
+                "first_aid_steps": None,
+                "recommendation": None,
+                "safety_warnings": [],
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
+
         if is_emergency_query(query):
-            return EMERGENCY_RESPONSE_TEXT, [], True
+            return {
+                "status": "emergency",
+                "emergency_mode": True,
+                "message": EMERGENCY_RESPONSE_TEXT,
+                "first_aid_steps": EMERGENCY_STEPS,
+                "recommendation": None,
+                "safety_warnings": [],
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
 
         if is_out_of_domain_query(query):
-            return OUT_OF_DOMAIN_RESPONSE, [], False
+            return {
+                "status": "out_of_domain",
+                "emergency_mode": False,
+                "message": OUT_OF_DOMAIN_RESPONSE,
+                "first_aid_steps": None,
+                "recommendation": None,
+                "safety_warnings": [],
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
 
-        if not self._bm25_index:
-            return (
-                "Поисковый индекс временно недоступен. Обратитесь к врачу.",
-                [],
-                False,
-            )
+        if not self._hybrid_index:
+            return {
+                "status": "success",
+                "emergency_mode": False,
+                "message": "Поисковый индекс временно недоступен. Обратитесь к врачу.",
+                "first_aid_steps": None,
+                "recommendation": None,
+                "safety_warnings": [],
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
 
-        # Check if query asks about a specific medicine attached or mentioned
-        if user_kit_names and self._bm25_index:
-            for kit_med in user_kit_names:
-                med_terms = self._analyzer.terms(kit_med)
-                matched = self._bm25_index.search(med_terms, top_k=1)
-                if matched and matched[0].score > 1.0:
-                    top_doc = matched[0].document
-                    sources = [
-                        {
-                            "doc_id": matched[0].doc_id,
-                            "title": matched[0].title,
-                            "bm25_score": matched[0].score,
-                        }
-                    ]
-                    indications_str = ", ".join(top_doc.indications[:3])
-                    contraindications_str = (
-                        ", ".join(top_doc.contraindications[:3])
-                        if top_doc.contraindications
-                        else "Не указаны"
-                    )
-                    full_text = (
-                        f"Препарат **{top_doc.title}** ({top_doc.inn}) — фармакотерапевтическая группа: {top_doc.category}.\n\n"
-                        f"**Показания к применению:** {indications_str}.\n"
-                        f"**Режим дозирования:** {top_doc.dosage}.\n"
-                        f"**Противопоказания:** {contraindications_str}.\n\n"
-                        f"*{DISCLAIMER_TEXT}*"
-                    )
-                    return full_text, sources, False
+        # 1. Resolve explicitly selected pills first (e.g. "что это", interactions check)
+        pill_results = self._find_docs_for_pills(selected_pills or [])
+        symptom_results = self._hybrid_index.search_hybrid(
+            query, top_k=3, bm25_min_gate=5.0
+        )
 
-        terms = self._analyzer.terms(query)
-        search_results: list[SearchResult] = self._bm25_index.search(terms, top_k=3)
+        # Combine pill results & symptom results uniquely
+        search_results: list[SearchResult] = []
+        seen_ids: set[str] = set()
+        for r in pill_results + symptom_results:
+            if r.doc_id not in seen_ids:
+                seen_ids.add(r.doc_id)
+                search_results.append(r)
 
-        if not search_results or search_results[0].score < 1.0:
-            return (
-                "В официальном корпусе медицинской аптечки нет информации о препаратах для указанных симптомов. "
-                "Рекомендуется обратиться к профильному врачу для очной консультации.",
-                [],
-                False,
-            )
+        # Compatibility fallback for callers passing pill names only via user_kit_names with vague query
+        if not search_results and user_kit_names:
+            search_results = self._find_docs_for_pills(user_kit_names)
 
-        top_doc = search_results[0].document
+        if not search_results:
+            return {
+                "status": "success",
+                "emergency_mode": False,
+                "message": (
+                    "В документах нет этой информации: в официальном корпусе домашней аптечки "
+                    "отсутствуют данные по вашему запросу. Рекомендуется обратиться к врачу."
+                ),
+                "first_aid_steps": None,
+                "recommendation": None,
+                "safety_warnings": [],
+                "sources": [],
+                "disclaimer": DISCLAIMER_TEXT,
+            }
+
+        docs: list[MedicineDocument] = [r.document for r in search_results[:3]]
+        safety_warnings = analyze_medicine_safety(
+            docs,
+            health_profile=health_profile,
+            user_kit_items=kit_items,
+        )
+
+        # Pick safest candidate from top-3 if top-1 triggers allergy/chronic conflict
+        chosen_doc = docs[0]
+        if safety_warnings and len(docs) > 1:
+            for cand in docs[1:]:
+                cand_warns = analyze_medicine_safety(
+                    [cand], health_profile=health_profile, user_kit_items=kit_items
+                )
+                if not cand_warns:
+                    chosen_doc = cand
+                    break
+
         sources = [
             {
                 "doc_id": r.doc_id,
                 "title": r.title,
                 "bm25_score": r.score,
             }
-            for r in search_results
+            for r in search_results[:3]
         ]
 
-        indications_str = ", ".join(top_doc.indications[:3])
-        contraindications_str = (
-            ", ".join(top_doc.contraindications[:3])
-            if top_doc.contraindications
-            else "Не указаны"
+        kit_lookup = [n.lower() for n in (user_kit_names or [])]
+        in_kit = any(
+            chosen_doc.inn.lower() in k or k in chosen_doc.title.lower()
+            for k in kit_lookup
         )
 
-        full_text = (
-            f"По результатам анализа симптомов рекомендуется рассмотреть препарат **{top_doc.title}** ({top_doc.inn}), "
-            f"фармакотерапевтическая группа: {top_doc.category}.\n\n"
-            f"**Показания:** {indications_str}.\n"
-            f"**Режим дозирования:** {top_doc.dosage}.\n"
-            f"**Противопоказания:** {contraindications_str}.\n\n"
-            f"*{DISCLAIMER_TEXT}*"
+        indications_str = ", ".join(chosen_doc.indications[:4])
+        contraindications_str = (
+            ", ".join(chosen_doc.contraindications[:3])
+            if chosen_doc.contraindications
+            else "Не указаны"
         )
-        return full_text, sources, False
+        interactions_str = (
+            ", ".join(chosen_doc.interactions[:2])
+            if chosen_doc.interactions
+            else "Не превышать максимальную суточную дозировку."
+        )
+
+        warn_block = ""
+        if safety_warnings:
+            warn_block = "\n\n**Предупреждения по вашей медкарте и аптечке:**\n" + "\n".join(
+                f"- {w}" for w in safety_warnings
+            )
+
+        if response_depth == "brief":
+            full_text = (
+                f"[{chosen_doc.id}] **{chosen_doc.title}** ({chosen_doc.inn}) — {chosen_doc.category}.\n"
+                f"**Дозировка:** {chosen_doc.dosage}"
+                f"{warn_block}\n\n*{DISCLAIMER_TEXT}*"
+            )
+        else:
+            full_text = (
+                f"По результатам анализа рекомендован препарат **[{chosen_doc.id}] {chosen_doc.title}** "
+                f"({chosen_doc.inn}), группа: {chosen_doc.category}.\n\n"
+                f"**Показания:** {indications_str}.\n"
+                f"**Режим дозирования:** {chosen_doc.dosage}\n"
+                f"**Противопоказания:** {contraindications_str}."
+                f"{warn_block}\n\n*{DISCLAIMER_TEXT}*"
+            )
+
+        if not verify_output_grounding(full_text, search_results):
+            full_text += "\n\n*(Сверьте дозировку с официальной инструкцией перед приемом.)*"
+
+        return {
+            "status": "success",
+            "emergency_mode": False,
+            "message": full_text,
+            "first_aid_steps": None,
+            "recommendation": {
+                "medicine_name": chosen_doc.title,
+                "in_user_kit": in_kit,
+                "dosage": chosen_doc.dosage,
+                "contraindications": contraindications_str,
+                "warnings": (
+                    " | ".join(safety_warnings)
+                    if safety_warnings
+                    else interactions_str
+                ),
+            },
+            "safety_warnings": safety_warnings,
+            "sources": sources,
+            "disclaimer": DISCLAIMER_TEXT,
+        }
+
+    async def _run_llm_agent_stream(
+        self,
+        dialog_id: UUID | None,
+        history: list[Message],
+        query: str,
+        safety_snapshot: dict[str, Any],
+        selected_pills: list[str],
+        response_depth: str,
+    ) -> tuple[str, bool]:
+        assert self._llm_provider is not None
+        assert self._hybrid_index is not None
+
+        tools = ToolRegistry(
+            [
+                SearchMedicinesTool(self._hybrid_index),
+                LookupMedicineTool(self._hybrid_index),
+                GetSafetyProfileTool(safety_snapshot),
+                CheckInteractionsTool(self._hybrid_index, safety_snapshot),
+            ]
+        )
+        agent = Agent(
+            llm_provider=self._llm_provider,
+            tool_registry=tools,
+            config=AgentConfig(system_prompt=self._system_prompt),
+        )
+
+        prompt_query = query
+        if selected_pills:
+            prompt_query = (
+                f"[Выбранные пользователем препараты: {', '.join(selected_pills)}] {query}"
+            )
+
+        req = UserRequest(
+            content=prompt_query,
+            response_depth="brief" if response_depth == "brief" else "detailed",
+            selected_pills=selected_pills,
+            user_kit_names=safety_snapshot.get("kit_names", []),
+            health_profile=safety_snapshot.get("health_profile"),
+        )
+
+        final_content = ""
+        used_llm = False
+        async for ev in agent.run(history, req):
+            if isinstance(ev, AgentTextDelta):
+                if dialog_id is not None:
+                    await self._broker.publish(
+                        dialog_id,
+                        DialogEvent(type=DialogEventType.MESSAGE_DELTA, delta=ev.content),
+                    )
+            elif isinstance(ev, AgentResponse):
+                final_content = ev.content
+                used_llm = ev.used_llm
+        return final_content, used_llm
 
     async def _process_message(
         self,
@@ -233,34 +554,84 @@ class DialogService:
         dialog_id: UUID,
         content: str,
         include_kit_context: bool,
+        selected_pills: list[str],
+        response_depth: str,
     ) -> None:
         try:
-            # 1. Publish message_start
             await self._broker.publish(
                 dialog_id,
                 DialogEvent(type=DialogEventType.MESSAGE_START),
             )
 
-            # 2. RAG Synthesis
-            full_text, sources, is_emergency = self._synthesize_rag(content)
+            safety_snapshot = (
+                await self._load_user_safety_snapshot(owner_id)
+                if include_kit_context
+                else {"kit_items": [], "kit_names": [], "health_profile": {}}
+            )
 
-            # 3. Stream text deltas in chunks
-            chunk_size = 24
-            for i in range(0, len(full_text), chunk_size):
-                chunk = full_text[i : i + chunk_size]
-                await self._broker.publish(
-                    dialog_id,
-                    DialogEvent(
-                        type=DialogEventType.MESSAGE_DELTA,
-                        delta=chunk,
-                    ),
-                )
-                await asyncio.sleep(0.01)
+            # Build structured clinical + RAG assessment first (for card & guardrails)
+            rag_res = self._synthesize_rag(
+                content,
+                user_kit_names=safety_snapshot.get("kit_names", []),
+                selected_pills=selected_pills,
+                health_profile=safety_snapshot.get("health_profile"),
+                kit_items=safety_snapshot.get("kit_items"),
+                response_depth=response_depth,
+            )
 
-            # 4. Atomically persist user and assistant messages
+            full_text = str(rag_res.get("message") or "")
+            used_llm = False
+            streamed_live = False
+
+            # Run live LLM Agent only if input passed guardrails (not emergency/injection/out-of-domain)
+            if rag_res["status"] == "success" and self._can_use_llm() and self._hybrid_index:
+                try:
+                    transcript = await self._history.get_transcript(owner_id, dialog_id)
+                    history = [
+                        Message(
+                            role=MessageRole.USER if m.role == "user" else MessageRole.ASSISTANT,
+                            content=m.content,
+                        )
+                        for m in transcript.messages[-6:]
+                        if m.role in ("user", "assistant")
+                    ]
+                    llm_text, used_llm = await self._run_llm_agent_stream(
+                        dialog_id=dialog_id,
+                        history=history,
+                        query=content,
+                        safety_snapshot=safety_snapshot,
+                        selected_pills=selected_pills,
+                        response_depth=response_depth,
+                    )
+                    if llm_text.strip():
+                        full_text = llm_text.strip()
+                        streamed_live = True
+                except Exception:
+                    logger.warning("LLM stream failed, falling back to deterministic RAG.")
+                    used_llm = False
+
+            if not streamed_live:
+                chunk_size = 24
+                for i in range(0, len(full_text), chunk_size):
+                    chunk = full_text[i : i + chunk_size]
+                    await self._broker.publish(
+                        dialog_id,
+                        DialogEvent(
+                            type=DialogEventType.MESSAGE_DELTA,
+                            delta=chunk,
+                        ),
+                    )
+                    await asyncio.sleep(0.005)
+
             rag_payload = {
-                "emergency_mode": is_emergency,
-                "sources": sources,
+                "status": rag_res["status"],
+                "emergency_mode": rag_res["emergency_mode"],
+                "first_aid_steps": rag_res.get("first_aid_steps"),
+                "recommendation": rag_res.get("recommendation"),
+                "safety_warnings": rag_res.get("safety_warnings", []),
+                "sources": rag_res.get("sources", []),
+                "disclaimer": rag_res.get("disclaimer", DISCLAIMER_TEXT),
+                "used_llm": used_llm,
             }
             title = make_title(content)
             _, asst_msg = await self._history.append_exchange(
@@ -272,14 +643,18 @@ class DialogService:
                 title=title,
             )
 
-            # 5. Publish message_end
             await self._broker.publish(
                 dialog_id,
                 DialogEvent(
                     type=DialogEventType.MESSAGE_END,
                     message_id=asst_msg.id,
-                    emergency_mode=is_emergency,
-                    sources=sources,
+                    status=rag_res["status"],
+                    emergency_mode=rag_res["emergency_mode"],
+                    first_aid_steps=rag_res.get("first_aid_steps"),
+                    recommendation=rag_res.get("recommendation"),
+                    safety_warnings=rag_res.get("safety_warnings"),
+                    sources=rag_res.get("sources", []),
+                    used_llm=used_llm,
                 ),
             )
             log_event(
@@ -288,6 +663,7 @@ class DialogService:
                 "dialog.message_processed",
                 dialog_id=str(dialog_id),
                 message_id=asst_msg.id,
+                used_llm=used_llm,
             )
 
         except Exception:
@@ -302,79 +678,68 @@ class DialogService:
             )
 
     def process_query_sync(
-        self, query: str, user_kit_names: list[str] | None = None
+        self,
+        query: str,
+        user_kit_names: list[str] | None = None,
+        *,
+        selected_pills: list[str] | None = None,
+        health_profile: dict[str, Any] | None = None,
+        kit_items: list[dict[str, Any]] | None = None,
+        response_depth: str = "detailed",
     ) -> dict[str, Any]:
-        """Synchronous query processor for legacy REST compatibility with /chat/query."""
-        if is_emergency_query(query):
-            return {
-                "status": "emergency",
-                "emergency_mode": True,
-                "message": EMERGENCY_RESPONSE_TEXT,
-                "first_aid_steps": [
-                    "Немедленно наберите номер службы спасения 112 или 103.",
-                    "При термическом ожоге: охлаждайте зону проточной водой 15 минут.",
-                    "Категорически запрещено наносить масла или мази.",
-                    "Наложите сухую повязку и обеспечьте покой до прибытия медиков.",
-                ],
-                "sources": [],
-                "disclaimer": DISCLAIMER_TEXT,
-            }
-
-        if is_out_of_domain_query(query):
-            return {
-                "status": "out_of_domain",
-                "emergency_mode": False,
-                "message": OUT_OF_DOMAIN_RESPONSE,
-                "first_aid_steps": None,
-                "recommendation": None,
-                "sources": [],
-                "disclaimer": DISCLAIMER_TEXT,
-            }
-
-        full_text, sources, is_emergency = self._synthesize_rag(
-            query, user_kit_names=user_kit_names
+        """Synchronous query processor for direct unit calls and fallback."""
+        res = self._synthesize_rag(
+            query,
+            user_kit_names=user_kit_names,
+            selected_pills=selected_pills,
+            health_profile=health_profile,
+            kit_items=kit_items,
+            response_depth=response_depth,
         )
-        if not sources:
-            return {
-                "status": "success",
-                "emergency_mode": False,
-                "message": full_text,
-                "recommendation": None,
-                "sources": [],
-                "disclaimer": DISCLAIMER_TEXT,
-            }
+        res["used_llm"] = False
+        return res
 
-        top_src = sources[0]
-        med_doc = (
-            self._bm25_index.documents[top_src["doc_id"]] if self._bm25_index else None
+    async def process_query_async(
+        self,
+        query: str,
+        *,
+        owner_id: UUID | None = None,
+        user_kit_names: list[str] | None = None,
+        selected_pills: list[str] | None = None,
+        health_profile: dict[str, Any] | None = None,
+        response_depth: str = "detailed",
+    ) -> dict[str, Any]:
+        """Async /chat/query handler enriching with DB profile/kit + optional live LLM."""
+        safety_snapshot = await self._load_user_safety_snapshot(
+            owner_id,
+            kit_names_override=user_kit_names,
+            health_override=health_profile,
         )
-        med_name = med_doc.title if med_doc else top_src["title"]
-        in_kit = False
-        if user_kit_names:
-            in_kit = any(med_name.lower() in k.lower() for k in user_kit_names)
-
-        return {
-            "status": "success",
-            "emergency_mode": False,
-            "message": full_text,
-            "recommendation": {
-                "medicine_name": med_name,
-                "in_user_kit": in_kit,
-                "dosage": med_doc.dosage if med_doc else "По инструкции",
-                "contraindications": (
-                    ", ".join(med_doc.contraindications)
-                    if med_doc
-                    else "См. инструкцию"
-                ),
-                "warnings": (
-                    ", ".join(med_doc.interactions)
-                    if med_doc
-                    else "Не превышать дозировку"
-                ),
-            },
-            "sources": sources,
-            "disclaimer": DISCLAIMER_TEXT,
-        }
+        res = self._synthesize_rag(
+            query,
+            user_kit_names=safety_snapshot.get("kit_names") or user_kit_names,
+            selected_pills=selected_pills,
+            health_profile=safety_snapshot.get("health_profile") or health_profile,
+            kit_items=safety_snapshot.get("kit_items"),
+            response_depth=response_depth,
+        )
+        used_llm = False
+        if res["status"] == "success" and self._can_use_llm() and self._hybrid_index:
+            try:
+                llm_text, used_llm = await self._run_llm_agent_stream(
+                    dialog_id=None,
+                    history=[],
+                    query=query,
+                    safety_snapshot=safety_snapshot,
+                    selected_pills=list(selected_pills or []),
+                    response_depth=response_depth,
+                )
+                if llm_text.strip():
+                    res["message"] = llm_text.strip()
+            except Exception:
+                logger.warning("LLM failed in /chat/query; using safety RAG synthesis.")
+        res["used_llm"] = used_llm
+        return res
 
     async def shutdown(self) -> None:
         async with self._lock:

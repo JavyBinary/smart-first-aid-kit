@@ -60,6 +60,19 @@ class LoginRequest(BaseModel):
     password: Password
 
 
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    old_password: Password
+    new_password: Password
+
+
+class RoleUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    role: Role
+
+
 class Credentials(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 

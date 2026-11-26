@@ -60,6 +60,15 @@ _SAFE_FIELDS = frozenset(
         "recall_at_1",
         "recall_at_3",
         "recall_at_5",
+        "history_size",
+        "max_iterations",
+        "message_count",
+        "tool_count",
+        "tool_name",
+        "used_llm",
+        "call_id",
+        "tool_call_id",
+        "report_id",
     }
 )
 _BASE_FIELDS = ("timestamp", "level", "logger", "event", *_CONTEXT_NAMES)

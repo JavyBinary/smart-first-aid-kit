@@ -9,6 +9,9 @@ from medai.dialogs.history import (
     DialogTranscript,
     HistoryStore,
     InMemoryHistoryStore,
+    MessageNotFoundError,
+    ReportExistsError,
+    ReportNewsItem,
     make_title,
 )
 from medai.dialogs.postgres import PostgresHistoryStore
@@ -21,14 +24,17 @@ __all__ = [
     "DialogEventType",
     "DialogMessage",
     "DialogNotFoundError",
+    "DialogService",
     "DialogSubscription",
     "DialogSummary",
     "DialogTranscript",
-    "DialogService",
     "HistoryStore",
     "InMemoryDialogEventBroker",
     "InMemoryHistoryStore",
+    "MessageNotFoundError",
     "PostgresHistoryStore",
+    "ReportExistsError",
+    "ReportNewsItem",
     "create_dialogs_router",
     "make_title",
 ]

@@ -1,13 +1,32 @@
-"""CLI script to load and validate medical knowledge package into BM25 index."""
+"""CLI script to load, validate, and persist medical knowledge package into PostgreSQL + BM25."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
+from medai.config import load_config
+from medai.db.engine import create_engine
 from medai.rag.analyzer import MorphAnalyzer
 from medai.rag.index import find_data_dir, load_package_from_yaml
+from medai.rag.postgres import PostgresRagStore
+
+
+async def _persist_to_db(target_path: Path) -> None:
+    cfg = load_config()
+    engine = create_engine(cfg.database)
+    try:
+        store = PostgresRagStore(engine)
+        summary = await store.replace_from_yaml(target_path)
+        print(
+            f"Загружено в PostgreSQL (load_id={summary.load_id}): "
+            f"{summary.document_count} препаратов, {summary.chunk_count} чанков, "
+            f"{summary.term_count} уникальных термов."
+        )
+    finally:
+        await engine.dispose()
 
 
 def main() -> None:
@@ -25,6 +44,11 @@ def main() -> None:
         type=Path,
         default=None,
         help="Directory containing package.yaml",
+    )
+    parser.add_argument(
+        "--db",
+        action="store_true",
+        help="Persist documents, chunks, embeddings, and BM25 index into PostgreSQL",
     )
     args = parser.parse_args()
 
@@ -47,6 +71,9 @@ def main() -> None:
         f"Успешно загружено и проиндексировано {index.document_count} препаратов. "
         f"Средняя длина документа: {index.average_length:.1f} термов."
     )
+
+    if args.db:
+        asyncio.run(_persist_to_db(target_path))
 
 
 if __name__ == "__main__":

@@ -45,3 +45,9 @@ specs:
       status: done
     - name: 023-robust-chat-auth-and-llm-integration
       status: done
+    - name: 024-postgres-rag-hybrid-and-benchmark
+      status: done
+    - name: 025-agent-runtime-litellm-and-safety
+      status: done
+    - name: 026-fullstack-sync-redis-csrf-tts-and-admin
+      status: done

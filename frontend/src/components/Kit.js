@@ -4,6 +4,7 @@
 
 import { store } from '../state/store.js';
 import { kitApi } from '../api/kit.api.js';
+import { profileApi } from '../api/profile.api.js';
 import { ConfirmModal } from './ConfirmModal.js';
 import { medicalCatalogModal } from './MedicalCatalogModal.js';
 import { addMedicineModal } from './AddMedicineModal.js';
@@ -70,6 +71,79 @@ export class Kit {
     const openAddMedBtn = this.container.querySelector('#openAddMedicineBtn');
     if (openAddMedBtn) {
       openAddMedBtn.onclick = () => addMedicineModal.open();
+    }
+
+    const auditBtn = this.container.querySelector('#kitAuditBtn');
+    const auditBanner = this.container.querySelector('#kitAuditBanner');
+    if (auditBtn && auditBanner) {
+      auditBtn.onclick = () => {
+        const state = store.getState();
+        const items = state.kitItems || [];
+        const profile = state.healthProfile || {};
+        const now = new Date();
+        const soon = new Date(now.getTime() + 60 * 86400000);
+        const expired = [];
+        const expiringSoon = [];
+        const allergyConflicts = [];
+        const allergies = (profile.allergies || []).map((a) => a.toLowerCase());
+        const paracetamolGroup = [];
+
+        items.forEach((item) => {
+          const expDate = item.expiry ? new Date(item.expiry) : null;
+          if (expDate && !Number.isNaN(expDate.getTime())) {
+            if (expDate < now) expired.push(item.name);
+            else if (expDate <= soon) expiringSoon.push(`${item.name} (до ${item.expiry})`);
+          }
+          const lname = (item.name || '').toLowerCase();
+          if (lname.includes('парацетамол') || lname.includes('терафлю') || lname.includes('колдрекс')) {
+            paracetamolGroup.push(item.name);
+          }
+          if (allergies.some((a) => a.includes('аспирин') || a.includes('нпвп') || a.includes('ибупрофен')) && (lname.includes('нурофен') || lname.includes('ибупрофен') || lname.includes('аспирин'))) {
+            allergyConflicts.push(`${item.name} (аллергия на НПВП)`);
+          }
+        });
+
+        const notes = [];
+        if (expired.length) notes.push(`⛔ Просрочено (${expired.length}): ${expired.join(', ')}`);
+        if (expiringSoon.length) notes.push(`⚠️ Истекает в течение 60 дней: ${expiringSoon.join(', ')}`);
+        if (paracetamolGroup.length > 1) notes.push(`💊 Дублирование парацетамола: ${paracetamolGroup.join(' + ')}`);
+        if (allergyConflicts.length) notes.push(`🚨 Конфликт с аллергопрофилем: ${allergyConflicts.join(', ')}`);
+
+        auditBanner.style.display = 'block';
+        if (notes.length === 0) {
+          auditBanner.style.background = '#ECFDF5';
+          auditBanner.style.borderColor = '#A7F3D0';
+          auditBanner.style.color = '#065F46';
+          auditBanner.innerHTML = items.length
+            ? '✓ Аудит пройден: просроченных препаратов и явных конфликтов с медкартой не найдено.'
+            : 'Аптечка пока пуста. Добавьте препараты из каталога или вручную.';
+        } else {
+          auditBanner.style.background = '#FFFBEB';
+          auditBanner.style.borderColor = '#FCD34D';
+          auditBanner.style.color = '#92400E';
+          auditBanner.innerHTML = `${notes.join('<br/>')}<br/><button id="closeAuditBannerBtn" style="margin-top:6px;border:none;background:none;color:inherit;text-decoration:underline;cursor:pointer;font-size:11.5px;">Скрыть</button>`;
+          auditBanner.querySelector('#closeAuditBannerBtn')?.addEventListener('click', () => {
+            auditBanner.style.display = 'none';
+          });
+        }
+      };
+    }
+
+    const exportBtn = this.container.querySelector('#kitExportBtn');
+    if (exportBtn) {
+      exportBtn.onclick = () => {
+        const state = store.getState();
+        const p = state.healthProfile || {};
+        const itemsHtml = (state.kitItems || []).map((i) => `<li><b>${i.name}</b> (${i.dosage || '—'}) — годен до ${i.expiry || '—'}</li>`).join('') || '<li>Аптечка пуста</li>';
+        const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Памятка MedAI</title><style>body{font-family:system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#111}h1{color:#00875A}li{margin:4px 0}</style></head><body><h1>Экстренная памятка MedAI (112)</h1><p><b>Владелец:</b> ${state.user.name || 'Пользователь'} | <b>Возраст:</b> ${p.age ?? '—'} | <b>Вес:</b> ${p.weight ?? '—'} кг</p><p><b>Аллергии:</b> ${(p.allergies || []).join(', ') || 'нет'}</p><p><b>Хронические диагнозы:</b> ${(p.chronic || []).join(', ') || 'нет'}</p><h2>Состав домашней аптечки</h2><ul>${itemsHtml}</ul></body></html>`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'medai-first-aid-card.html';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
     }
 
     // 3. Поиск по аптечке
@@ -442,13 +516,20 @@ export class Kit {
     const openChronicBtn = medcardMount.querySelector('#openChronicCatalogBtn');
     if (openChronicBtn) openChronicBtn.onclick = () => medicalCatalogModal.open('chronic');
 
-    // Хелпер тихого обновления с сохранением точного скролла
+    // Хелпер тихого обновления с сохранением точного скролла и синхронизацией с сервером
+    const syncProfileServer = (profile) => {
+      if (store.isAuthenticated()) {
+        profileApi.updateProfile(profile).catch(() => {});
+      }
+    };
+
     const updateProfileAndStay = (updater) => {
       const scrollContainer = this.container.querySelector('.medcard-panel-wrap');
       const scrollPos = scrollContainer ? scrollContainer.scrollTop : 0;
       const curProfile = { ...store.getState().healthProfile };
       updater(curProfile);
       store.setHealthProfile(curProfile, true);
+      syncProfileServer(curProfile);
       this.renderMedcard();
       const newScrollContainer = this.container.querySelector('.medcard-panel-wrap');
       if (newScrollContainer) {
@@ -511,6 +592,7 @@ export class Kit {
         const val = Number(e.target.value);
         const curProfile = { ...store.getState().healthProfile, age: val };
         store.setHealthProfile(curProfile, true);
+        syncProfileServer(curProfile);
       });
     }
 
@@ -526,6 +608,7 @@ export class Kit {
         const val = Number(e.target.value);
         const curProfile = { ...store.getState().healthProfile, weight: val };
         store.setHealthProfile(curProfile, true);
+        syncProfileServer(curProfile);
       });
     }
 
@@ -648,7 +731,12 @@ export class Kit {
             <span>В наличии:</span>
             <strong id="kitSummaryCount">0 препаратов</strong>
           </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="kitAuditBtn" class="msg-action-btn tap-effect" title="Проверить сроки годности, дубли и совместимость с медкартой">Аудит</button>
+            <button id="kitExportBtn" class="msg-action-btn tap-effect" title="Скачать памятку аптечки и аллергий для печати">Памятка</button>
+          </div>
         </div>
+        <div id="kitAuditBanner" style="display: none; margin: 6px 18px 2px; padding: 9px 12px; border-radius: 10px; font-size: 12px; line-height: 1.45; background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E;"></div>
 
         <!-- Отдельная кнопка добавления своего лекарства над поиском -->
         <div class="kit-add-action-wrap">

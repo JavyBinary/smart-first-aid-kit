@@ -1,4 +1,4 @@
-.PHONY: help run run-ui dev-frontend run-backend migrate create-admin test bench knowledge-load lint format spec-list
+.PHONY: help run run-ui dev-frontend run-backend migrate create-admin test bench knowledge-check knowledge-load knowledge-export knowledge-delete knowledge-restore knowledge-search lint format spec-list
 
 PYTHON ?= python3
 
@@ -11,8 +11,13 @@ help:
 	@echo "  make migrate      - Применение миграций схемы базы данных (Alembic)"
 	@echo "  make create-admin - Создание учетной записи администратора (EMAIL=<email> [ROLE=admin|superadmin])"
 	@echo "  make test         - Запуск модульных тестов backend и интеграционных проверок"
-	@echo "  make bench        - Запуск бенчмарка BM25 (MRR, Recall@k)"
-	@echo "  make knowledge-load - Загрузка и валидация пакета знаний (DIR=<dir>)"
+	@echo "  make bench        - Запуск бенчмарка BM25 + Hybrid Ablation (MRR, Recall@k, Accuracy, Faithfulness)"
+	@echo "  make knowledge-check   - Валидация YAML-пакета знаний без БД (DIR=<dir>)"
+	@echo "  make knowledge-load    - Загрузка пакета знаний в PostgreSQL и индексация ([DIR=<dir>] [DB=1])"
+	@echo "  make knowledge-export  - Выгрузка корпуса знаний из PostgreSQL в YAML (DIR=<dir>)"
+	@echo "  make knowledge-delete  - Удаление препаратов по ID из PostgreSQL (IDS=\"D01 ...\")"
+	@echo "  make knowledge-restore - Восстановление препарата из ревизии PostgreSQL (ID=D01 [REV=N])"
+	@echo "  make knowledge-search  - Поиск по корпусу знаний из CLI (QUERY=\"...\")"
 	@echo "  make lint         - Проверка качества кода линтером (Ruff + синтаксис)"
 	@echo "  make format       - Автоматическое форматирование кода (Ruff)"
 	@echo "  make spec-list    - Просмотр реестра спецификаций SDD"
@@ -57,6 +62,20 @@ test:
 	else \
 		$(PYTHON) -m unittest discover -s tests -p "test_*.py" 2>/dev/null || echo "Модульные тесты завершены."; \
 	fi
+	@if command -v node >/dev/null 2>&1 && ls frontend/tests/*.test.js >/dev/null 2>&1; then \
+		echo "Запуск unit-тестов frontend..."; \
+		node --test frontend/tests/*.test.js; \
+	fi
+
+test-integration:
+	@echo "Запуск E2E-тестов с реальными PostgreSQL и Redis..."
+	@docker compose -f docker/compose.test.yaml up -d
+	@until docker compose -f docker/compose.test.yaml exec -T postgres-test pg_isready -U medai -d medai_test >/dev/null 2>&1; do sleep 1; done
+	@until docker compose -f docker/compose.test.yaml exec -T redis-test redis-cli ping >/dev/null 2>&1; do sleep 1; done
+	@(cd backend && MEDAI_INTEGRATION=1 PYTHONPATH=src uv run pytest tests/integration -v); \
+	status=$$?; \
+	docker compose -f docker/compose.test.yaml down -v; \
+	exit $$status
 
 bench:
 	@echo "Запуск бенчмарка поискового ядра BM25..."
@@ -68,9 +87,28 @@ bench:
 		echo "Бенчмарк-раннер не найден."; \
 	fi
 
+knowledge-check:
+	@cd backend && uv run python -m medai.rag check "$(or $(DIR),../data/medicines)"
+
 knowledge-load:
-	@echo "Загрузка и валидация медицинского корпуса BM25..."
-	@cd backend && uv run python -m medai.rag.knowledge_load $(if $(DIR),--dir "$(DIR)",)
+	@echo "Загрузка и индексация медицинского корпуса BM25/Hybrid..."
+	@cd backend && uv run python -m medai.rag.knowledge_load $(if $(DIR),--dir "$(DIR)",) $(if $(filter 1,$(DB)),--db,)
+
+knowledge-export:
+	@test -n "$(DIR)" || { echo "Использование: make knowledge-export DIR=<dir>" >&2; exit 2; }
+	@cd backend && uv run python -m medai.rag export "$(DIR)"
+
+knowledge-delete:
+	@test -n "$(IDS)" || { echo "Использование: make knowledge-delete IDS=\"D01 D02\"" >&2; exit 2; }
+	@cd backend && uv run python -m medai.rag delete $(IDS)
+
+knowledge-restore:
+	@test -n "$(ID)" || { echo "Использование: make knowledge-restore ID=D01 [REV=N]" >&2; exit 2; }
+	@cd backend && uv run python -m medai.rag restore "$(ID)" $(if $(REV),--revision "$(REV)",)
+
+knowledge-search:
+	@test -n "$(QUERY)" || { echo "Использование: make knowledge-search QUERY=\"...\"" >&2; exit 2; }
+	@cd backend && uv run python -m medai.rag search "$(QUERY)" $(if $(TOPK),--top-k "$(TOPK)",)
 
 lint:
 	@echo "Проверка линтером Ruff..."

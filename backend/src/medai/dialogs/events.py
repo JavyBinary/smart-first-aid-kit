@@ -30,8 +30,13 @@ class DialogEvent(BaseModel):
     code: str | None = None
     message: str | None = None
     message_id: int | None = None
+    status: str | None = None
     emergency_mode: bool | None = None
+    first_aid_steps: list[str] | None = None
+    recommendation: dict[str, Any] | None = None
+    safety_warnings: list[str] | None = None
     sources: list[dict[str, Any]] | None = None
+    used_llm: bool | None = None
 
 
 class DialogSubscription(Protocol):

@@ -1,4 +1,4 @@
-"""Dialog history domain models, persistence abstraction, and in-memory store."""
+"""Dialog history domain models, persistence abstraction, feedback, reports, and in-memory store."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ __all__ = [
     "DialogTranscript",
     "HistoryStore",
     "InMemoryHistoryStore",
+    "MessageNotFoundError",
+    "ReportExistsError",
+    "ReportNewsItem",
     "make_title",
 ]
 
@@ -36,6 +39,26 @@ class DialogNotFoundError(Exception):
         self.dialog_id = dialog_id
 
 
+class MessageNotFoundError(Exception):
+    def __init__(self, message_id: int) -> None:
+        super().__init__(f"Message {message_id} not found.")
+        self.message_id = message_id
+
+
+class ReportExistsError(Exception):
+    def __init__(self, message_id: int) -> None:
+        super().__init__(f"Report already exists for message {message_id}.")
+        self.message_id = message_id
+
+
+class ReportNewsItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    report_id: int
+    dialog_id: UUID | None = None
+    dialog_title: str
+
+
 class DialogSummary(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -53,6 +76,8 @@ class DialogMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
     rag_payload: dict[str, Any] | None = None
+    feedback: int | None = None
+    reported: bool = False
     created_at: datetime
 
 
@@ -95,6 +120,34 @@ class HistoryStore(ABC):
     ) -> tuple[DialogMessage, DialogMessage]:
         """Atomically append a user-assistant message exchange."""
 
+    async def set_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int, score: int
+    ) -> None:
+        raise NotImplementedError
+
+    async def clear_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int
+    ) -> None:
+        raise NotImplementedError
+
+    async def create_report(
+        self,
+        owner_id: UUID,
+        dialog_id: UUID,
+        message_id: int,
+        reason: str,
+        comment: str | None,
+    ) -> int:
+        raise NotImplementedError
+
+    async def list_report_news(self, owner_id: UUID) -> list[ReportNewsItem]:
+        return []
+
+    async def mark_report_news_seen(
+        self, owner_id: UUID, report_ids: list[int]
+    ) -> None:
+        return None
+
 
 class InMemoryHistoryStore(HistoryStore):
     """In-memory history store implementation for rapid unit and contract testing."""
@@ -102,6 +155,9 @@ class InMemoryHistoryStore(HistoryStore):
     def __init__(self) -> None:
         self._dialogs: dict[UUID, dict[str, Any]] = {}
         self._messages: dict[UUID, list[DialogMessage]] = {}
+        self._feedback: dict[int, int] = {}
+        self._reports: dict[int, dict[str, Any]] = {}
+        self._report_id_counter = 1
         self._msg_id_counter = 1
 
     async def create_dialog(self, owner_id: UUID) -> UUID:
@@ -137,10 +193,23 @@ class InMemoryHistoryStore(HistoryStore):
         dialog = self._dialogs.get(dialog_id)
         if dialog is None or dialog["owner_id"] != owner_id:
             raise DialogNotFoundError(dialog_id)
+        msgs = [
+            DialogMessage(
+                id=m.id,
+                position=m.position,
+                role=m.role,
+                content=m.content,
+                rag_payload=m.rag_payload,
+                feedback=self._feedback.get(m.id),
+                reported=m.id in self._reports,
+                created_at=m.created_at,
+            )
+            for m in self._messages.get(dialog_id, [])
+        ]
         return DialogTranscript(
             dialog_id=dialog_id,
             title=dialog["title"],
-            messages=list(self._messages.get(dialog_id, [])),
+            messages=msgs,
         )
 
     async def delete_dialog(self, owner_id: UUID, dialog_id: UUID) -> bool:
@@ -194,3 +263,55 @@ class InMemoryHistoryStore(HistoryStore):
 
         msgs.extend([user_msg, assistant_msg])
         return user_msg, assistant_msg
+
+    def _find_assistant_message(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int
+    ) -> tuple[DialogMessage, DialogMessage | None]:
+        dialog = self._dialogs.get(dialog_id)
+        if dialog is None or dialog["owner_id"] != owner_id:
+            raise DialogNotFoundError(dialog_id)
+        msgs = self._messages.get(dialog_id, [])
+        for idx, msg in enumerate(msgs):
+            if msg.id == message_id and msg.role == "assistant":
+                prev_msg = msgs[idx - 1] if idx > 0 else None
+                return msg, prev_msg
+        raise MessageNotFoundError(message_id)
+
+    async def set_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int, score: int
+    ) -> None:
+        self._find_assistant_message(owner_id, dialog_id, message_id)
+        self._feedback[message_id] = score
+
+    async def clear_feedback(
+        self, owner_id: UUID, dialog_id: UUID, message_id: int
+    ) -> None:
+        self._find_assistant_message(owner_id, dialog_id, message_id)
+        self._feedback.pop(message_id, None)
+
+    async def create_report(
+        self,
+        owner_id: UUID,
+        dialog_id: UUID,
+        message_id: int,
+        reason: str,
+        comment: str | None,
+    ) -> int:
+        msg, prev_msg = self._find_assistant_message(owner_id, dialog_id, message_id)
+        if message_id in self._reports:
+            raise ReportExistsError(message_id)
+        report_id = self._report_id_counter
+        self._report_id_counter += 1
+        self._reports[message_id] = {
+            "id": report_id,
+            "dialog_id": dialog_id,
+            "user_id": owner_id,
+            "dialog_title": self._dialogs[dialog_id]["title"],
+            "reason": reason,
+            "comment": comment,
+            "request_text": prev_msg.content if prev_msg else "",
+            "answer_text": msg.content,
+            "status": "new",
+            "seen_at": None,
+        }
+        return report_id

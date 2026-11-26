@@ -4,6 +4,7 @@
  */
 
 import { store } from '../state/store.js';
+import { profileApi } from '../api/profile.api.js';
 
 export const MEDICAL_CATALOG_DATA = {
   chronic: [
@@ -91,7 +92,11 @@ export class MedicalCatalogModal {
   close() {
     this.overlay.style.display = 'none';
     if (this.hasChanges) {
-      store.notify('health:updated', store.getState().healthProfile);
+      const profile = store.getState().healthProfile;
+      store.notify('health:updated', profile);
+      if (store.isAuthenticated()) {
+        profileApi.updateProfile(profile).catch(() => {});
+      }
     }
   }
 

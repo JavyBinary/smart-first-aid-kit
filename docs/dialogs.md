@@ -1,6 +1,6 @@
-# Диалоговый слой, Event Broker и потоковая передача SSE
+# Диалоговый слой, Agent Runtime, SSE и обратная связь
 
-Архитектура диалогового взаимодействия MedAI связывает HTTP REST API с resident-движком BM25 и шиной событий в реальном времени.
+Архитектура диалогового взаимодействия MedAI объединяет потоковую передачу SSE, агентский runtime на базе LiteLLM, инструменты безопасности аптечки/медкарты и контур обратной связи.
 
 ---
 
@@ -8,22 +8,16 @@
 
 ```mermaid
 flowchart TD
-    Client["Клиент (Web UI / Mobile)"] -->|POST /dialogs| API["FastAPI Dialog Router"]
+    Client["SPA Клиент"] -->|POST /dialogs/{id}/messages| API["FastAPI Dialog Router"]
     Client -->|GET /dialogs/{id}/events (SSE)| API
-    Client -->|POST 202 /dialogs/{id}/messages| API
-    Client -->|POST /chat/query (sync)| API
 
     API --> Service["DialogService"]
-    Service --> History[("PostgresHistoryStore<br>(dialogs, messages)")]
-    Service --> Broker["InMemoryDialogEventBroker<br>(очереди 64 события)"]
-    Service --> BM25["InMemoryBm25Index (data/medicines)"]
-    Service --> Tasks["Фоновая цепочка задач<br>(asyncio.Task per dialog)"]
-
-    Tasks -->|message_start| Broker
-    Tasks -->|BM25 Search & Synthesis| BM25
-    Tasks -->|message_delta chunks| Broker
-    Tasks -->|atomic append| History
-    Tasks -->|message_end| Broker
+    Service --> Guard["Guardrails (Injection / Red Flag / OOD)"]
+    Service --> Agent["Agent Runtime + LiteLLMProvider"]
+    Agent --> Tools["Medical Safety Tools<br>(Аптечка + Медкарта + Дубли МНН)"]
+    Agent --> Hybrid["HybridRagIndex (BM25 + Dense + RRF)"]
+    Service --> History[("PostgreSQL (dialogs, messages, feedback, reports)")]
+    Service --> Broker["InMemoryDialogEventBroker"]
     Broker -->|SSE Stream| Client
 ```
 
@@ -36,59 +30,28 @@ sequenceDiagram
     participant Client as Клиент (Браузер)
     participant API as FastAPI Router
     participant Service as DialogService
-    participant Broker as InMemoryDialogEventBroker
-    participant Worker as Background Task
-    participant DB as PostgresHistoryStore
+    participant Agent as Agent & Safety Tools
+    participant DB as PostgresDialogStore
 
     Client->>API: GET /api/v1/dialogs/{id}/events
-    API->>Service: subscribe(user_id, dialog_id)
-    Service->>Broker: subscribe(dialog_id)
-    Broker-->>API: DialogSubscription
-    API-->>Client: event: ready {"dialog_id": "..."}
+    API-->>Client: event: ready
 
-    Client->>API: POST /api/v1/dialogs/{id}/messages {"content": "..."}
-    API->>Service: submit_message(user_id, dialog_id, content)
-    Service->>Worker: поставить задачу в цепочку диалога
-    Service-->>API: подтверждение постановки
-    API-->>Client: 202 Accepted (пустое тело)
+    Client->>API: POST /api/v1/dialogs/{id}/messages {"content", "response_depth"}
+    API-->>Client: 202 Accepted
 
-    Worker->>Broker: publish(message_start)
-    Broker-->>Client: event: message_start
-
-    Worker->>Worker: Проверка Red Flags & поиск BM25
-    loop Потоковая передача дельт
-        Worker->>Broker: publish(message_delta)
-        Broker-->>Client: event: message_delta {"delta": "..."}
-    end
-
-    Worker->>DB: append_exchange(user_msg, assistant_msg, rag_payload)
-    DB-->>Worker: сохраненные сообщения
-
-    Worker->>Broker: publish(message_end, message_id, sources)
-    Broker-->>Client: event: message_end {"message_id": 2, ...}
+    Service-->>Client: event: message_start
+    Service->>Service: Проверка Prompt Injection, Red Flags, OOD
+    Service->>Agent: run(query, kit_items, health_profile, response_depth)
+    Agent->>Agent: Поиск Hybrid RAG + check_drug_interactions
+    Agent-->>Service: grounded response + safety_warnings + recommendation
+    Service->>DB: append_exchange(user_msg, assistant_msg, rag_payload)
+    Service-->>Client: event: message_end {"message_id", "recommendation", "safety_warnings", "sources", "used_llm"}
 ```
 
 ---
 
-## 3. Спецификация событий SSE
+## 3. Оценки, жалобы и озвучивание
 
-| Тип события | Полезная нагрузка (`data`) | Назначение |
-|---|---|---|
-| `ready` | `{"dialog_id": "uuid"}` | Подтверждение установления SSE-соединения |
-| `message_start` | `{}` | Старт синтеза ответа ассистента |
-| `message_delta` | `{"delta": "строка"}` | Инкрементальный текстовый фрагмент ответа |
-| `message_end` | `{"message_id": int, "emergency_mode": bool, "sources": [...]}` | Завершение ответа с метаданными RAG |
-| `message_error` | `{"code": "internal_error", "message": "текст"}` | Уведомление о сбое генерации |
-| `keep-alive` | `: keep-alive` (SSE comment) | Пинг каждые 10 секунд при простое |
-
----
-
-## 4. Контракты эндпоинтов
-
-- `POST /api/v1/dialogs` — создание нового диалога (`201 Created`, заголовок `Location: /api/v1/dialogs/{id}`).
-- `GET /api/v1/dialogs` — список диалогов пользователя с сортировкой по `updated_at` desc.
-- `GET /api/v1/dialogs/{id}/messages` — полная стенограмма сообщений диалога (`200 OK`).
-- `DELETE /api/v1/dialogs/{id}` — удаление диалога и закрытие брокера (`204 No Content`).
-- `POST /api/v1/dialogs/{id}/messages` — постановка запроса в фоновую очередь (`202 Accepted`).
-- `GET /api/v1/dialogs/{id}/events` — потоковая передача (`text/event-stream`).
-- `POST /api/v1/chat/query` — синхронный JSON-фасад RAG для совместимости с фронтендом.
+- **Оценка ответа (`1..5`):** `PUT /api/v1/dialogs/{id}/messages/{msg_id}/feedback` фиксирует оценку в `message_feedback` для аналитики в Admin 2.0.
+- **Жалобы и уведомления:** `POST .../report` создает тикет в `message_reports`; после модерации администратором клиент получает уведомление через `GET /api/v1/reports/news` и подтверждает прочтение (`POST /api/v1/reports/news/seen`).
+- **Озвучивание (`POST .../audio`):** серверный маршрутизатор озвучки (или возврат `503`, при котором UI прозрачно использует встроенный синтез речи браузера `SpeechSynthesis` на русском языке).

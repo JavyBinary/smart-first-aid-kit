@@ -1,10 +1,12 @@
 /**
- * App: Главная точка входа клиентского приложения Аптечка
+ * App: Главная точка входа клиентского приложения MedAI (синхронизирована с PostgreSQL/SSE)
  */
 
 import { store } from './state/store.js';
 import { kitApi } from './api/kit.api.js';
 import { authApi } from './api/auth.api.js';
+import { profileApi } from './api/profile.api.js';
+import { dialogsApi } from './api/dialogs.api.js';
 import { AmbientBackground } from './components/AmbientBackground.js';
 import { Catalog } from './components/Catalog.js';
 import { Chat } from './components/Chat.js';
@@ -13,19 +15,50 @@ import { AccountProfileModal } from './components/AccountProfileModal.js';
 import { ConfirmModal } from './components/ConfirmModal.js';
 import { ColabRunner } from './components/ColabRunner.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Инициализация атмосферного зимнего фона
-  const canvas = document.getElementById('ambientCanvas');
-  if (canvas) {
-    new AmbientBackground(canvas);
-  }
+function mapServerMessages(serverMessages) {
+  if (!Array.isArray(serverMessages)) return [];
+  return serverMessages.map((m) => {
+    const rag = m.rag_payload || {};
+    if (m.role === 'user') {
+      return {
+        id: m.id,
+        serverMessageId: m.id,
+        sender: 'user',
+        text: m.content,
+        attachedPills: [],
+      };
+    }
+    return {
+      id: m.id,
+      serverMessageId: m.id,
+      sender: 'bot',
+      text: m.content,
+      isEmergency: Boolean(rag.emergency_mode),
+      feedback: m.feedback ?? null,
+      reported: Boolean(m.reported),
+      data: {
+        message: m.content,
+        emergency_mode: Boolean(rag.emergency_mode),
+        first_aid_steps: rag.first_aid_steps || [],
+        recommendation: rag.recommendation || null,
+        safety_warnings: rag.safety_warnings || [],
+        sources: rag.sources || [],
+        used_llm: Boolean(rag.used_llm),
+      },
+    };
+  });
+}
 
-  // 2. Инициализация новогодней гирлянды с дугами-фестонами
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1. Атмосферный фон
+  const canvas = document.getElementById('ambientCanvas');
+  if (canvas) new AmbientBackground(canvas);
+
+  // 2. Новогодняя гирлянда
   const garlandBulbs = document.getElementById('garlandBulbs');
   if (garlandBulbs) {
     const bulbColors = ['#FF3B30', '#FFB300', '#00B074', '#4EA8DE', '#AF52DE', '#FF9500'];
-    const count = 32;
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < 32; i++) {
       const node = document.createElement('div');
       node.className = 'garland-bulb-node';
       const col = bulbColors[i % bulbColors.length];
@@ -37,32 +70,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 3. Интерактивная «Пилюля на прогулке» в стиле Google Colab
+  // 3. Маскот-пилюля
   const colabRunner = new ColabRunner(document.body);
-
   const treeTrigger = document.getElementById('brandTreeTrigger');
-  if (treeTrigger) {
-    treeTrigger.addEventListener('click', () => colabRunner.runAcross());
-  }
+  if (treeTrigger) treeTrigger.addEventListener('click', () => colabRunner.runAcross());
 
-  // 4. Инициализация модальных окон
+  // 4. Модальные окна и основные компоненты
   const modalOverlay = document.getElementById('modalOverlay');
   const accountModal = new AccountProfileModal(modalOverlay);
-
-  // 5. Монтирование компонентов
   const catalogMount = document.getElementById('catalogViewMount');
   const chatMount = document.getElementById('chatViewMount');
   const kitMount = document.getElementById('kitColumnMount');
 
   const catalog = new Catalog(catalogMount);
-  const chat = new Chat(chatMount);
-  const kit = new Kit(kitMount);
+  new Chat(chatMount);
+  new Kit(kitMount);
 
-  // 6. Загрузка стартовых медикаментов
-  const initialItems = await kitApi.getItems();
-  store.setKitItems(initialItems);
-
-  // 7. Переключение центральных табов (Умная консультация <-> Аптека)
+  // 5. Переключение вкладок
   const tabChatBtn = document.getElementById('tabChatBtn');
   const tabCatalogBtn = document.getElementById('tabCatalogBtn');
 
@@ -86,40 +110,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   tabChatBtn.addEventListener('click', () => switchTab('chat'));
   tabCatalogBtn.addEventListener('click', () => switchTab('catalog'));
 
-  // 8. Симметричное управление сайдбарами
+  // 6. Управление боковыми панелями
   const appContainer = document.getElementById('appContainer');
   const leftRail = document.getElementById('leftRail');
   const kitColumn = document.getElementById('kitColumnMount');
-  const toggleLeftBtn = document.getElementById('toggleLeftRailBtn');
-  const toggleRightBtn = document.getElementById('toggleRightRailBtn');
+  document.getElementById('toggleLeftRailBtn')?.addEventListener('click', () => {
+    const isCollapsed = store.toggleLeftSidebar();
+    appContainer.classList.toggle('left-collapsed', isCollapsed);
+    leftRail.classList.toggle('collapsed', isCollapsed);
+  });
+  document.getElementById('toggleRightRailBtn')?.addEventListener('click', () => {
+    const isCollapsed = store.toggleRightSidebar();
+    appContainer.classList.toggle('right-collapsed', isCollapsed);
+    kitColumn.classList.toggle('collapsed', isCollapsed);
+  });
 
-  if (toggleLeftBtn) {
-    toggleLeftBtn.addEventListener('click', () => {
-      const isCollapsed = store.toggleLeftSidebar();
-      appContainer.classList.toggle('left-collapsed', isCollapsed);
-      leftRail.classList.toggle('collapsed', isCollapsed);
-    });
-  }
-
-  if (toggleRightBtn) {
-    toggleRightBtn.addEventListener('click', () => {
-      const isCollapsed = store.toggleRightSidebar();
-      appContainer.classList.toggle('right-collapsed', isCollapsed);
-      kitColumn.classList.toggle('collapsed', isCollapsed);
-    });
-  }
-
-  // 9. Мультичат: рендеринг списка сессий в левом рейле
+  // 7. Диалоги в левом рейле
   const sessionsList = document.getElementById('chatSessionsList');
   const newChatBtn = document.getElementById('newChatBtn');
 
   function getSessionBadge(title) {
     if (!title) return 'Д';
     const words = title.trim().split(/\s+/).filter(Boolean);
-    if (words.length >= 2) {
-      return (words[0][0] + words[1][0]).toUpperCase();
+    return words.length >= 2 ? (words[0][0] + words[1][0]).toUpperCase() : title.slice(0, 2).toUpperCase();
+  }
+
+  async function ensureDialogLoaded(session) {
+    if (!session || !store.isAuthenticated() || !session.serverBacked || session.loadedFromServer) return;
+    const res = await dialogsApi.getMessages(session.id);
+    if (res && !res._fallback && !res._status && Array.isArray(res.messages)) {
+      store.setSessionMessages(session.id, mapServerMessages(res.messages));
     }
-    return title.slice(0, 2).toUpperCase();
   }
 
   function renderSessions() {
@@ -135,11 +156,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           lastMsgText = (lastMsg.text || '').replace(/\s+/g, ' ').trim();
         }
         const snippet = lastMsgText ? (lastMsgText.slice(0, 36) + (lastMsgText.length > 36 ? '…' : '')) : '';
-        const hoverTooltip = `${s.title}${lastMsgText ? '\nПоследнее: ' + lastMsgText.slice(0, 100) : ''}`;
         const badgeText = getSessionBadge(s.title);
-
         return `
-          <div class="session-item tap-effect ${s.id === state.activeSessionId ? 'active' : ''}" data-id="${s.id}" title="${hoverTooltip}">
+          <div class="session-item tap-effect ${s.id === state.activeSessionId ? 'active' : ''}" data-id="${s.id}">
             <span class="session-badge-initials">${badgeText}</span>
             <div class="session-text-block">
               <span class="session-title-text">${s.title}</span>
@@ -152,12 +171,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
 
     sessionsList.querySelectorAll('.session-item').forEach(item => {
-      item.addEventListener('click', (e) => {
+      item.addEventListener('click', async (e) => {
         if (e.target.closest('.session-delete-btn')) return;
         const id = item.dataset.id;
         store.switchSession(id);
         switchTab('chat');
         renderSessions();
+        const session = store.getState().sessions.find((s) => s.id === id);
+        await ensureDialogLoaded(session);
       });
     });
 
@@ -172,8 +193,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           cancelText: 'Отмена',
           danger: true
         });
-
         if (confirmed) {
+          const target = store.getState().sessions.find((s) => s.id === id);
+          if (store.isAuthenticated() && target && target.serverBacked) {
+            await dialogsApi.deleteDialog(id);
+          }
           store.deleteSession(id);
           renderSessions();
         }
@@ -181,7 +205,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  newChatBtn.addEventListener('click', () => {
+  newChatBtn.addEventListener('click', async () => {
+    if (store.isAuthenticated()) {
+      const created = await dialogsApi.createDialog('Новый диалог');
+      if (created && created.dialog_id) {
+        store.createSession('Новый диалог', created.dialog_id);
+        switchTab('chat');
+        renderSessions();
+        return;
+      }
+    }
     store.createSession();
     switchTab('chat');
     renderSessions();
@@ -190,32 +223,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderSessions();
   store.subscribe('sessions:updated', () => renderSessions());
 
-  // 10. Профиль пользователя (Аккаунт КТ1) и RBAC для панели администратора
-  const userBadgeBtn = document.getElementById('userProfileBadge');
-  if (userBadgeBtn) {
-    userBadgeBtn.addEventListener('click', () => accountModal.open());
-  }
-
-  const profileSettingsBtn = document.getElementById('profileSettingsBtn');
-  if (profileSettingsBtn) {
-    profileSettingsBtn.addEventListener('click', () => accountModal.open());
-  }
-
-  const railLogoutBtn = document.getElementById('railLogoutBtn');
-  if (railLogoutBtn) {
-    railLogoutBtn.addEventListener('click', () => {
-      store.logout();
-    });
-  }
+  // 8. Профиль и RBAC
+  document.getElementById('userProfileBadge')?.addEventListener('click', () => accountModal.open());
+  document.getElementById('profileSettingsBtn')?.addEventListener('click', () => accountModal.open());
+  document.getElementById('railLogoutBtn')?.addEventListener('click', () => store.logout());
 
   const adminBtn = document.getElementById('adminQuickSwitchBtn');
-  function syncAdminVisibility(user) {
-    if (adminBtn) {
-      const isAdmin = user && (user.role === 'admin' || user.role === 'superadmin');
-      adminBtn.style.display = isAdmin ? 'flex' : 'none';
-    }
-  }
-  
   function applyUserProfile(user) {
     const isGuest = user.role === 'guest' || !user.email;
     const nameEl = document.querySelector('.user-meta-name');
@@ -223,17 +236,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const statusEl = document.querySelector('.user-meta-status');
     if (statusEl) {
-      if (isGuest) {
-        statusEl.textContent = 'Гостевой режим';
-      } else if (user.role === 'superadmin') {
-        statusEl.textContent = 'Суперадминистратор';
-      } else if (user.role === 'admin') {
-        statusEl.textContent = 'Администратор';
-      } else {
-        statusEl.textContent = 'Личный профиль';
-      }
+      if (isGuest) statusEl.textContent = 'Гостевой режим';
+      else if (user.role === 'superadmin') statusEl.textContent = 'Суперадминистратор';
+      else if (user.role === 'admin') statusEl.textContent = 'Администратор';
+      else statusEl.textContent = 'Личный профиль';
     }
-    
+
     const avatarEl = document.querySelector('.user-avatar-circle');
     if (avatarEl) {
       if (user.avatar) {
@@ -244,29 +252,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         avatarEl.textContent = (user.name || 'П')[0].toUpperCase();
       }
     }
-    syncAdminVisibility(user);
+    if (adminBtn) {
+      adminBtn.style.display = (user.role === 'admin' || user.role === 'superadmin') ? 'flex' : 'none';
+    }
   }
 
-  // Применяем профиль немедленно при загрузке
-  applyUserProfile(store.getState().user);
-
-  // Валидируем и восстанавливаем реальную сессию с бэкенда по cookie
-  authApi.getMe().then(me => {
-    if (me && me.id) {
-      store.state.user = {
-        name: me.name,
-        email: me.email,
-        role: me.role,
-        avatar: ''
-      };
-      localStorage.setItem('medai_user', me.email);
-      localStorage.setItem('medai_name', me.name);
-      localStorage.setItem('medai_role', me.role);
-      applyUserProfile(store.getState().user);
+  // 9. Проверка реальной cookie-сессии и гидратация данных из PostgreSQL
+  const me = await authApi.getMe();
+  if (me && me.id) {
+    store.setUser({ id: me.id, name: me.name, email: me.email, role: me.role });
+    const [kitItems, profileData, serverDialogs, reportNews] = await Promise.all([
+      kitApi.getItems(),
+      profileApi.getProfile(),
+      dialogsApi.listDialogs(),
+      dialogsApi.getReportNews(),
+    ]);
+    if (Array.isArray(kitItems)) {
+      store.setKitItems(kitItems);
+      catalog.updateCardButtons();
     }
-  }).catch(() => {});
+    if (profileData) {
+      store.setHealthProfile(profileData);
+    } else {
+      store.setHealthProfile({ age: 25, weight: 65, allergies: [], chronic: [], notes: [] });
+    }
+    if (Array.isArray(serverDialogs) && serverDialogs.length > 0) {
+      const mapped = serverDialogs.map((d) => ({
+        id: d.dialog_id,
+        title: d.title || 'Консультация',
+        date: 'История',
+        messages: [],
+        serverBacked: true,
+        loadedFromServer: false,
+      }));
+      store.setSessions(mapped, mapped[0].id);
+      await ensureDialogLoaded(mapped[0]);
+    } else {
+      store.setSessions([{ id: 'sess_default', title: 'Новый диалог', date: 'Сегодня', messages: [], serverBacked: false }]);
+    }
+    store.setReportNews(reportNews);
+  } else {
+    store.setUser({ id: null, name: 'Гость', email: '', role: 'guest', avatar: '' });
+    store.setKitItems([]);
+    applyUserProfile(store.getState().user);
+  }
 
-  store.subscribe('user:updated', (user) => {
-    applyUserProfile(user);
-  });
+  store.subscribe('user:updated', (user) => applyUserProfile(user));
 });

@@ -1,12 +1,12 @@
 /**
- * Централизованный реактивный Store приложения Аптечка
+ * Централизованный реактивный Store приложения MedAI
  */
+import { authApi } from '../api/auth.api.js';
 
 class AppStore {
   constructor() {
     this.subscribers = new Map();
 
-    // Загрузка сохраненных сессий чата
     const savedSessions = localStorage.getItem('medai_sessions');
     let initialSessions = [];
     if (savedSessions) {
@@ -16,26 +16,33 @@ class AppStore {
     }
     if (!initialSessions.length) {
       initialSessions = [
-        { id: 'sess_default', title: 'Консультация по симптомам', date: 'Сегодня', messages: [] }
+        { id: 'sess_default', title: 'Новый диалог', date: 'Сегодня', messages: [], serverBacked: false }
       ];
     }
 
-    // Загрузка медкарты
     const savedHealth = localStorage.getItem('medai_health_profile');
-    let healthProfile = { allergies: [], chronic: [] };
+    let healthProfile = { age: 25, weight: 65, allergies: [], chronic: [], notes: [] };
     if (savedHealth) {
       try {
-        healthProfile = JSON.parse(savedHealth);
+        const parsed = JSON.parse(savedHealth);
+        healthProfile = {
+          age: parsed.age ?? 25,
+          weight: parsed.weight ?? 65,
+          allergies: Array.isArray(parsed.allergies) ? parsed.allergies : [],
+          chronic: Array.isArray(parsed.chronic) ? parsed.chronic : [],
+          notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+        };
       } catch (e) {}
     }
 
-    const savedRole = localStorage.getItem('medai_role') || 'user';
+    const savedRole = localStorage.getItem('medai_role') || 'guest';
     const isGuest = savedRole === 'guest';
     const savedName = localStorage.getItem('medai_name');
     const savedUser = localStorage.getItem('medai_user');
 
     this.state = {
       user: {
+        id: null,
         name: isGuest ? 'Гость' : (savedName || 'Пользователь'),
         email: isGuest ? '' : (savedUser || ''),
         role: savedRole,
@@ -50,12 +57,19 @@ class AppStore {
       mascotState: 'idle', // 'idle' | 'thinking' | 'happy' | 'emergency'
       leftSidebarCollapsed: false,
       rightSidebarCollapsed: false,
-      rightActiveTab: 'kit' // 'kit' | 'medcard'
+      rightActiveTab: 'kit', // 'kit' | 'medcard'
+      responseDepth: localStorage.getItem('medai_depth') || 'detailed',
+      voice: localStorage.getItem('medai_voice') || 'baya',
+      reportNews: [],
     };
   }
 
   getState() {
     return this.state;
+  }
+
+  isAuthenticated() {
+    return this.state.user.role !== 'guest' && Boolean(this.state.user.email);
   }
 
   subscribe(event, callback) {
@@ -73,8 +87,8 @@ class AppStore {
   }
 
   setKitItems(items) {
-    this.state.kitItems = items;
-    this.notify('kit:updated', items);
+    this.state.kitItems = Array.isArray(items) ? items : [];
+    this.notify('kit:updated', this.state.kitItems);
   }
 
   addKitItem(item) {
@@ -109,12 +123,43 @@ class AppStore {
     this.notify('mascot:stateChanged', state);
   }
 
-  createSession(title = 'Новый диалог') {
+  setResponseDepth(depth) {
+    this.state.responseDepth = depth === 'brief' ? 'brief' : 'detailed';
+    localStorage.setItem('medai_depth', this.state.responseDepth);
+    this.notify('depth:changed', this.state.responseDepth);
+  }
+
+  setVoice(voice) {
+    this.state.voice = voice || 'baya';
+    localStorage.setItem('medai_voice', this.state.voice);
+    this.notify('voice:changed', this.state.voice);
+  }
+
+  setReportNews(news) {
+    this.state.reportNews = Array.isArray(news) ? news : [];
+    this.notify('reportNews:updated', this.state.reportNews);
+  }
+
+  setSessions(sessions, activeSessionId = null) {
+    const list = Array.isArray(sessions) && sessions.length
+      ? sessions
+      : [{ id: 'sess_default', title: 'Новый диалог', date: 'Сегодня', messages: [], serverBacked: false }];
+    this.state.sessions = list;
+    this.state.activeSessionId = activeSessionId && list.some(s => s.id === activeSessionId)
+      ? activeSessionId
+      : list[0].id;
+    this.persistSessions();
+    this.notify('sessions:updated', this.state.sessions);
+    this.notify('session:switched', this.state.sessions.find(s => s.id === this.state.activeSessionId));
+  }
+
+  createSession(title = 'Новый диалог', serverId = null) {
     const newSession = {
-      id: `sess_${Date.now()}`,
+      id: serverId || `sess_${Date.now()}`,
       title,
       date: 'Сегодня',
-      messages: []
+      messages: [],
+      serverBacked: Boolean(serverId),
     };
     this.state.sessions.unshift(newSession);
     this.state.activeSessionId = newSession.id;
@@ -124,10 +169,34 @@ class AppStore {
     return newSession;
   }
 
+  replaceSessionId(oldId, newId, newTitle = null) {
+    const session = this.state.sessions.find(s => s.id === oldId);
+    if (!session) return;
+    session.id = newId;
+    session.serverBacked = true;
+    if (newTitle) session.title = newTitle;
+    if (this.state.activeSessionId === oldId) {
+      this.state.activeSessionId = newId;
+    }
+    this.persistSessions();
+    this.notify('sessions:updated', this.state.sessions);
+  }
+
   switchSession(sessionId) {
     this.state.activeSessionId = sessionId;
     const session = this.state.sessions.find(s => s.id === sessionId);
     this.notify('session:switched', session);
+  }
+
+  setSessionMessages(sessionId, messages) {
+    const session = this.state.sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    session.messages = Array.isArray(messages) ? messages : [];
+    session.loadedFromServer = true;
+    this.persistSessions();
+    if (this.state.activeSessionId === sessionId) {
+      this.notify('messages:updated', session.messages);
+    }
   }
 
   deleteSession(sessionId) {
@@ -148,32 +217,53 @@ class AppStore {
     const session = this.state.sessions.find(s => s.id === this.state.activeSessionId);
     if (session) {
       session.messages.push(msg);
-      // Авто-генерация заголовка первого сообщения
       if (session.messages.length === 1 && msg.sender === 'user') {
-        session.title = msg.text.slice(0, 32) + (msg.text.length > 32 ? '…' : '');
+        session.title = msg.text.slice(0, 36) + (msg.text.length > 36 ? '…' : '');
       }
       this.persistSessions();
       this.notify('messages:updated', session.messages);
       this.notify('sessions:updated', this.state.sessions);
     }
+    return msg;
+  }
+
+  updateMessageInSession(sessionId, messageId, updater) {
+    const session = this.state.sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    const idx = session.messages.findIndex(m => m.id === messageId);
+    if (idx === -1) return;
+    const current = session.messages[idx];
+    session.messages[idx] = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+    this.persistSessions();
+    if (this.state.activeSessionId === sessionId) {
+      this.notify('messages:updated', session.messages);
+    }
   }
 
   setUser(userData) {
     this.state.user = { ...this.state.user, ...userData };
-    if (userData.name) localStorage.setItem('medai_name', userData.name);
-    if (userData.email) localStorage.setItem('medai_user', userData.email);
-    if (userData.role) localStorage.setItem('medai_role', userData.role);
-    if (userData.avatar) localStorage.setItem('medai_avatar', userData.avatar);
+    if (userData.name !== undefined) localStorage.setItem('medai_name', userData.name || '');
+    if (userData.email !== undefined) localStorage.setItem('medai_user', userData.email || '');
+    if (userData.role !== undefined) localStorage.setItem('medai_role', userData.role || 'guest');
+    if (userData.avatar !== undefined) localStorage.setItem('medai_avatar', userData.avatar || '');
     this.notify('user:updated', this.state.user);
   }
 
-  logout() {
+  async logout() {
+    try {
+      await authApi.logout();
+    } catch {}
     localStorage.removeItem('medai_token');
     localStorage.removeItem('medai_user');
     localStorage.removeItem('medai_name');
     localStorage.removeItem('medai_role');
     localStorage.removeItem('medai_avatar');
-    this.state.user = { name: 'Гость', email: '', role: 'guest', avatar: '' };
+    localStorage.removeItem('medai_sessions');
+    localStorage.removeItem('medai_health_profile');
+    this.state.user = { id: null, name: 'Гость', email: '', role: 'guest', avatar: '' };
+    this.state.kitItems = [];
+    this.state.selectedPills = [];
+    this.state.healthProfile = { age: 25, weight: 65, allergies: [], chronic: [], notes: [] };
     this.notify('user:updated', this.state.user);
     window.location.href = 'login.html';
   }

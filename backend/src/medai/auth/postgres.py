@@ -127,6 +127,31 @@ class PostgresUserStore(UserStore):
         async with self._engine.begin() as conn:
             await conn.execute(stmt)
 
+    async def update_role(
+        self,
+        user_id: UUID,
+        role: Role,
+        now: datetime,
+    ) -> User | None:
+        stmt = (
+            update(users)
+            .where(users.c.id == user_id)
+            .values(role=role.value, updated_at=now)
+            .returning(users)
+        )
+        async with self._engine.begin() as conn:
+            result = await conn.execute(stmt)
+            row = result.mappings().first()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                email=row["email"],
+                name=row["name"],
+                role=Role(row["role"]),
+                avatar_color=row["avatar_color"],
+            )
+
 
 class PostgresSessionStore(SessionStore):
     def __init__(self, engine: AsyncEngine) -> None:

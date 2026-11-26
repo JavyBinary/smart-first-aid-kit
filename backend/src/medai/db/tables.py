@@ -91,6 +91,7 @@ user_kits = Table(
     Column("dosage", Text, nullable=False),
     Column("form", Text, nullable=False),
     Column("category", Text, nullable=False),
+    Column("tags", JSON_TYPE, nullable=False, server_default=text("'[]'")),
     Column("status", Text, nullable=False, server_default=text("'otc'")),
     Column("expiry_date", Date, nullable=False),
     Column("quantity", Integer, nullable=False, server_default=text("1")),
@@ -218,5 +219,193 @@ rag_bm25_index = Table(
     Column("term_frequencies", JSON_TYPE, nullable=False),
     Column(
         "updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+)
+
+rag_chunks = Table(
+    "rag_chunks",
+    metadata,
+    Column("id", BigInteger, Identity(always=True), primary_key=True),
+    Column(
+        "doc_id",
+        Text,
+        ForeignKey("rag_medicines.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("position", Integer, nullable=False),
+    Column("section", Text, nullable=False, server_default=text("'general'")),
+    Column("text", Text, nullable=False),
+    Column("term_count", Integer, nullable=False),
+    Column("embedding", JSON_TYPE, nullable=False, server_default=text("'[]'")),
+    UniqueConstraint("doc_id", "position", name="rag_chunks_doc_position_key"),
+)
+Index("rag_chunks_doc_id_idx", rag_chunks.c.doc_id)
+
+rag_terms = Table(
+    "rag_terms",
+    metadata,
+    Column("term", Text, primary_key=True),
+    Column("df", Integer, nullable=False),
+    CheckConstraint("df >= 1", name="rag_terms_df_positive"),
+)
+
+rag_postings = Table(
+    "rag_postings",
+    metadata,
+    Column("term", Text, primary_key=True),
+    Column(
+        "chunk_id",
+        BigInteger,
+        ForeignKey("rag_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("tf", Integer, nullable=False),
+    CheckConstraint("tf >= 1", name="rag_postings_tf_positive"),
+)
+Index("rag_postings_chunk_id_idx", rag_postings.c.chunk_id)
+
+rag_stats = Table(
+    "rag_stats",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("n_chunks", Integer, nullable=False),
+    Column("avgdl", Float, nullable=False),
+    Column("version", BigInteger, nullable=False),
+    CheckConstraint("id = 1", name="rag_stats_singleton"),
+)
+
+rag_loads = Table(
+    "rag_loads",
+    metadata,
+    Column("id", BigInteger, Identity(always=True), primary_key=True),
+    Column("operation", Text, nullable=False, server_default=text("'load'")),
+    Column("document_count", Integer, nullable=False, server_default=text("0")),
+    Column("chunk_count", Integer, nullable=False, server_default=text("0")),
+    Column("term_count", Integer, nullable=False, server_default=text("0")),
+    Column(
+        "started_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    Column("finished_at", DateTime(timezone=True), nullable=True),
+    CheckConstraint(
+        "operation IN ('load', 'delete', 'restore')", name="rag_loads_operation_valid"
+    ),
+)
+
+rag_revisions = Table(
+    "rag_revisions",
+    metadata,
+    Column("id", BigInteger, Identity(always=True), primary_key=True),
+    Column("doc_id", Text, nullable=False, index=True),
+    Column("revision", Integer, nullable=False),
+    Column("operation", Text, nullable=False),
+    Column("snapshot", JSON_TYPE, nullable=False),
+    Column(
+        "created_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    UniqueConstraint("doc_id", "revision", name="rag_revisions_doc_rev_key"),
+    CheckConstraint(
+        "operation IN ('create', 'update', 'delete', 'restore')",
+        name="rag_revisions_operation_valid",
+    ),
+)
+
+message_feedback = Table(
+    "message_feedback",
+    metadata,
+    Column(
+        "message_id",
+        BigInteger,
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("score", Integer, nullable=False),
+    Column(
+        "created_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    Column(
+        "updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint("score >= 1 AND score <= 5", name="message_feedback_score_valid"),
+)
+
+message_reports = Table(
+    "message_reports",
+    metadata,
+    Column("id", BigInteger, Identity(always=True), primary_key=True),
+    Column(
+        "message_id",
+        BigInteger,
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+    ),
+    Column(
+        "dialog_id",
+        Uuid,
+        ForeignKey("dialogs.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("dialog_title", Text, nullable=False, server_default=text("''")),
+    Column("reason", Text, nullable=False),
+    Column("comment", Text, nullable=True),
+    Column("request_text", Text, nullable=False),
+    Column("answer_text", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default=text("'new'")),
+    Column("dialog_deleted", Integer, nullable=False, server_default=text("0")),
+    Column(
+        "created_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    Column("resolved_at", DateTime(timezone=True), nullable=True),
+    Column(
+        "resolved_by",
+        Uuid,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
+    Column("seen_at", DateTime(timezone=True), nullable=True),
+    CheckConstraint(
+        "status IN ('new', 'resolved', 'dismissed')",
+        name="message_reports_status_valid",
+    ),
+)
+
+message_audio = Table(
+    "message_audio",
+    metadata,
+    Column(
+        "message_id",
+        BigInteger,
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("voice_id", Text, primary_key=True),
+    Column("status", Text, nullable=False),
+    Column("text_hash", Text, nullable=False),
+    Column("mime_type", Text, nullable=False, server_default=text("'audio/mpeg'")),
+    Column("audio_data", LargeBinary, nullable=True),
+    Column("duration_ms", Integer, nullable=True),
+    Column("error_code", Text, nullable=True),
+    Column(
+        "created_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    Column(
+        "updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()
+    ),
+    CheckConstraint(
+        "status IN ('pending', 'ready', 'failed')",
+        name="message_audio_status_valid",
     ),
 )

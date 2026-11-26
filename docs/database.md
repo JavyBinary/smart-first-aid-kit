@@ -1,6 +1,6 @@
 # Архитектура базы данных PostgreSQL (MedAI)
 
-Реляционная модель данных для серверного контура умной аптечки MedAI (кафедра ИУ5 МГТУ им. Н. Э. Баумана).
+Реляционная модель данных PostgreSQL 17 с расширением `pg_trgm` для нечеткого поиска и таблицами гибридного RAG-индекса.
 
 ---
 
@@ -11,9 +11,15 @@ erDiagram
     USERS ||--o{ REFRESH_SESSIONS : "сессии обновления"
     USERS ||--o{ USER_KITS : "содержимое аптечки"
     USERS ||--o| HEALTH_PROFILES : "медицинская карта"
-    USERS ||--o{ DIALOGS : "консультационные сессии"
+    USERS ||--o{ DIALOGS : "диалоги"
     DIALOGS ||--o{ MESSAGES : "сообщения"
-    RAG_MEDICINES ||--o| RAG_BM25_INDEX : "инвертированный индекс"
+    MESSAGES ||--o{ MESSAGE_FEEDBACK : "оценки 1..5"
+    MESSAGES ||--o{ MESSAGE_REPORTS : "жалобы"
+    MESSAGES ||--o{ MESSAGE_AUDIO : "озвучка"
+    RAG_MEDICINES ||--o{ RAG_CHUNKS : "структурные чанки"
+    RAG_CHUNKS ||--o{ RAG_POSTINGS : "инвертированный индекс"
+    RAG_TERMS ||--o{ RAG_POSTINGS : "словарь термов"
+    RAG_LOADS ||--o{ RAG_REVISIONS : "версионирование корпуса"
 
     USERS {
         uuid id PK
@@ -26,17 +32,6 @@ erDiagram
         timestamptz updated_at
     }
 
-    REFRESH_SESSIONS {
-        uuid id PK
-        uuid user_id FK "on delete cascade"
-        uuid family_id
-        bytea token_hash "unique sha256"
-        timestamptz created_at
-        timestamptz expires_at
-        timestamptz revoked_at
-        uuid replaced_by FK
-    }
-
     USER_KITS {
         uuid id PK
         uuid user_id FK "on delete cascade"
@@ -44,49 +39,16 @@ erDiagram
         text dosage
         text form
         text category
+        jsonb tags "список симптомов"
         text status "otc | rx"
         date expiry_date
         integer quantity
-        text notes
-        text icon_color
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    HEALTH_PROFILES {
-        uuid id PK
-        uuid user_id FK "unique on delete cascade"
-        integer age
-        float weight_kg
-        jsonb chronic_diseases
-        jsonb allergies
-        text special_notes
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    DIALOGS {
-        uuid id PK
-        uuid user_id FK "on delete cascade"
-        text title
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    MESSAGES {
-        bigint id PK
-        uuid dialog_id FK "on delete cascade"
-        integer position
-        text role "user | assistant | system"
-        text content
-        jsonb rag_payload
-        timestamptz created_at
     }
 
     RAG_MEDICINES {
         text id PK "D01, D02..."
-        text title
-        text inn
+        text title "GIN pg_trgm"
+        text inn "GIN pg_trgm"
         text atc_code
         text category
         jsonb forms
@@ -95,23 +57,27 @@ erDiagram
         text dosage_text
         jsonb interactions
         jsonb emergency_flags
-        timestamptz created_at
-        timestamptz updated_at
     }
 
-    RAG_BM25_INDEX {
-        text doc_id PK, FK "on delete cascade"
-        text lemmatized_text
-        integer doc_length
-        jsonb term_frequencies
-        timestamptz updated_at
+    RAG_CHUNKS {
+        bigint id PK
+        text doc_id FK "on delete cascade"
+        integer chunk_index
+        text section
+        text content
+        integer token_len
+        jsonb embedding
     }
 ```
 
 ---
 
-## 2. Инварианты безопасности и целостности
-1. **Каскадное удаление данных:** При удалении пользователя каскадно удаляются сессии, аптечка, медкарта и диалоги (`ON DELETE CASCADE`).
-2. **Безопасность параметров SQL:** В модуле `engine.py` флаг `hide_parameters=True` гарантирует, что пароли и токены не попадут в текст логов или исключений при сбоях.
-3. **Хранение токенов:** Токены сессий хранятся в бинарном поле `LargeBinary` в виде дайджестов SHA-256. В открытом виде токены в базе никогда не сохраняются.
-4. **Контроль ролей:** Допустимые значения ролей зафиксированы констрейнтом `users_role_valid` (`user`, `admin`, `superadmin`). Роль `superadmin` обладает иммунитетом от удаления.
+## 2. Миграции и наполнение
+
+- Миграция `0001_initial_schema.py` создает базовые таблицы пользователей, аптечки, медкарты, диалогов и реестра лекарств.
+- Миграция `0002_rag_hybrid_feedback_admin.py` добавляет колонку `user_kits.tags`, включает расширение `pg_trgm` с GIN-индексами по `rag_medicines.title` и `inn`, а также таблицы `rag_chunks`, `rag_terms`, `rag_postings`, `rag_stats`, `rag_loads`, `rag_revisions`, `message_feedback`, `message_reports`, `message_audio`.
+
+```bash
+make migrate
+make knowledge-load DB=1
+```

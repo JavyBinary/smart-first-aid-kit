@@ -136,13 +136,14 @@ export class AddMedicineModal {
         form: formType,
         category,
         expiry,
-        is_prescription: this.isPrescription,
-        isPrescription: this.isPrescription,
+        quantity: 1,
+        status: this.isPrescription ? 'rx' : 'otc',
         tags: [category.toLowerCase(), name.toLowerCase()]
       };
 
-      store.addKitItem(newItem);
-      kitApi.addItem(newItem);
+      const saved = await kitApi.addItem(newItem);
+      const itemToStore = saved && saved.id ? saved : newItem;
+      store.addKitItem(itemToStore);
 
       this.close();
     };

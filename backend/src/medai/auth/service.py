@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from medai.auth.models import (
     AccessClaims,
@@ -19,6 +19,7 @@ from medai.auth.passwords import Argon2PasswordHasher
 from medai.auth.rate_limiter import RateLimiter
 from medai.auth.stores import SessionStore, UserStore
 from medai.auth.tokens import TokenCodec, hash_refresh_token, new_refresh_token
+from medai.cache.blacklist import InMemoryTokenBlacklist, TokenBlacklist
 from medai.config import AuthConfig
 
 __all__ = ["AuthService"]
@@ -34,6 +35,7 @@ class AuthService:
         hasher: Argon2PasswordHasher,
         tokens: TokenCodec,
         limiter: RateLimiter,
+        blacklist: TokenBlacklist | None = None,
     ) -> None:
         self._config = config
         self._users = users
@@ -41,6 +43,7 @@ class AuthService:
         self._hasher = hasher
         self._tokens = tokens
         self._limiter = limiter
+        self._blacklist: TokenBlacklist = blacklist or InMemoryTokenBlacklist()
         self._refresh_ttl = timedelta(seconds=config.refresh_ttl_seconds)
 
     async def register(
@@ -156,11 +159,20 @@ class AuthService:
         self,
         *,
         refresh_token: str | None,
+        access_token: str | None = None,
         now: datetime | None = None,
     ) -> None:
+        current_time = datetime.now(UTC) if now is None else now
+        if access_token:
+            try:
+                claims = self._tokens.decode_access(access_token, current_time)
+                ttl = int((claims.expires_at - current_time).total_seconds())
+                if ttl > 0:
+                    await self._blacklist.revoke(claims.jti, ttl)
+            except UnauthorizedError:
+                pass
         if not refresh_token:
             return
-        current_time = datetime.now(UTC) if now is None else now
         token_hash = hash_refresh_token(refresh_token)
         session = await self._sessions.get_session_by_token_hash(token_hash)
         if session and session.revoked_at is None:
@@ -173,10 +185,50 @@ class AuthService:
     ) -> tuple[User, AccessClaims]:
         current_time = datetime.now(UTC) if now is None else now
         claims = self._tokens.decode_access(access_token, current_time)
+        if await self._blacklist.is_revoked(claims.jti):
+            raise UnauthorizedError("Token has been revoked.")
         user = await self._users.get_by_id(claims.user_id)
         if user is None:
             raise UnauthorizedError()
         return user, claims
+
+    async def change_password(
+        self,
+        *,
+        user_id: UUID,
+        old_password: str,
+        new_password: str,
+        access_jti: str | None = None,
+        access_ttl_seconds: int = 900,
+        now: datetime | None = None,
+    ) -> None:
+        current_time = datetime.now(UTC) if now is None else now
+        user = await self._users.get_by_id(user_id)
+        if user is None:
+            raise UnauthorizedError()
+        user_with_pw = await self._users.get_by_email(user.email)
+        if user_with_pw is None:
+            raise UnauthorizedError()
+        valid = await self._hasher.verify(user_with_pw.password_hash, old_password)
+        if not valid:
+            raise InvalidCredentialsError()
+        new_hash = await self._hasher.hash(new_password)
+        await self._users.update_password(user.id, new_hash, current_time)
+        await self._sessions.revoke_all_user_sessions(user.id, current_time)
+        if access_jti:
+            await self._blacklist.revoke(access_jti, access_ttl_seconds)
+
+    async def update_user_role(
+        self,
+        *,
+        target_user_id: UUID,
+        new_role: Role,
+        now: datetime | None = None,
+    ) -> User | None:
+        if hasattr(self._users, "update_role"):
+            current_time = datetime.now(UTC) if now is None else now
+            return await self._users.update_role(target_user_id, new_role, current_time)
+        return None
 
     async def list_users(self) -> list[User]:
         if hasattr(self._users, "list_all"):
