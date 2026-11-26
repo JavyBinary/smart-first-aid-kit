@@ -35,6 +35,7 @@ export class Chat {
     this.container = containerElement;
     this.emptyMascot = null;
     this.activeUnsubscribe = null;
+    this.activeAudio = null;
     this.burnTimers = new Map();
 
     this.render();
@@ -115,11 +116,30 @@ export class Chat {
     if (voiceSelect) {
       voiceSelect.addEventListener('change', (e) => {
         store.setVoice(e.target.value);
+        this.stopAllAudio();
       });
     }
     store.subscribe('voice:changed', (v) => {
       const sel = this.container.querySelector('#chatVoiceSelect');
       if (sel && sel.value !== v) sel.value = v;
+    });
+  }
+
+  stopAllAudio() {
+    if (this.activeAudio) {
+      try {
+        this.activeAudio.pause();
+        this.activeAudio.currentTime = 0;
+      } catch {}
+      this.activeAudio = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    this.container.querySelectorAll('.msg-tts-btn').forEach((b) => {
+      b.dataset.speaking = '0';
+      b.classList.remove('active');
+      b.textContent = 'Озвучить';
     });
   }
 
@@ -665,17 +685,52 @@ export class Chat {
         ].filter(Boolean).join('. ');
 
         if (btn.dataset.speaking === '1') {
-          this.speakRussianText(btn, textToRead, msg.id);
+          this.stopAllAudio();
           return;
         }
+
+        this.stopAllAudio();
+        const voice = store.getState().voice || 'baya';
+        btn.dataset.speaking = '1';
+        btn.classList.add('active');
+        btn.textContent = 'Синтез...';
+
+        let audioUrl = null;
         if (store.isAuthenticated() && sessionId && msg.serverMessageId) {
-          const res = await dialogsApi.requestAudio(sessionId, msg.serverMessageId, store.getState().voice);
+          const res = await dialogsApi.requestAudio(sessionId, msg.serverMessageId, voice);
           if (res && !res._fallback && !res._error && res.audio_url) {
-            const audio = new Audio(res.audio_url);
-            audio.play().catch(() => this.speakRussianText(btn, textToRead, msg.id));
-            return;
+            audioUrl = res.audio_url;
           }
         }
+        if (!audioUrl) {
+          audioUrl = await dialogsApi.synthesizeSpeech(textToRead, voice);
+        }
+
+        if (audioUrl) {
+          const audio = new Audio(audioUrl);
+          this.activeAudio = audio;
+          btn.textContent = 'Стоп ⏹';
+          const cleanup = () => {
+            if (this.activeAudio === audio) this.activeAudio = null;
+            btn.dataset.speaking = '0';
+            btn.classList.remove('active');
+            btn.textContent = 'Озвучить';
+          };
+          audio.onended = cleanup;
+          audio.onerror = () => {
+            cleanup();
+            this.speakRussianText(btn, textToRead, msg.id);
+          };
+          audio.play().catch(() => {
+            cleanup();
+            this.speakRussianText(btn, textToRead, msg.id);
+          });
+          return;
+        }
+
+        btn.dataset.speaking = '0';
+        btn.classList.remove('active');
+        btn.textContent = 'Озвучить';
         this.speakRussianText(btn, textToRead, msg.id);
       });
     });

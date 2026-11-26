@@ -112,4 +112,21 @@ export const dialogsApi = {
             body: JSON.stringify({ voice }),
         });
     },
+
+    async synthesizeSpeech(text, voice = 'baya') {
+        const base = getApiBase();
+        try {
+            const resp = await fetch(`${base}/speech/synthesize`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice }),
+            });
+            if (!resp.ok) return null;
+            const blob = await resp.blob();
+            return URL.createObjectURL(blob);
+        } catch {
+            return null;
+        }
+    },
 };
