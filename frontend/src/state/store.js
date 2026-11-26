@@ -228,9 +228,9 @@ class AppStore {
   }
 
   updateMessageInSession(sessionId, messageId, updater) {
-    const session = this.state.sessions.find(s => s.id === sessionId);
+    const session = this.state.sessions.find(s => String(s.id) === String(sessionId));
     if (!session) return;
-    const idx = session.messages.findIndex(m => m.id === messageId);
+    const idx = session.messages.findIndex(m => String(m.id) === String(messageId));
     if (idx === -1) return;
     const current = session.messages[idx];
     session.messages[idx] = typeof updater === 'function' ? updater(current) : { ...current, ...updater };

@@ -110,6 +110,17 @@ export class Chat {
         store.setResponseDepth(btn.dataset.depth);
       });
     });
+
+    const voiceSelect = this.container.querySelector('#chatVoiceSelect');
+    if (voiceSelect) {
+      voiceSelect.addEventListener('change', (e) => {
+        store.setVoice(e.target.value);
+      });
+    }
+    store.subscribe('voice:changed', (v) => {
+      const sel = this.container.querySelector('#chatVoiceSelect');
+      if (sel && sel.value !== v) sel.value = v;
+    });
   }
 
   async sendPromptText(promptText) {
@@ -345,18 +356,66 @@ export class Chat {
     if (sendBtn) sendBtn.disabled = false;
   }
 
-  speakRussianText(btn, text) {
-    if (!text) return;
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'ru-RU';
-      utter.rate = 1.02;
-      btn.classList.add('active');
-      utter.onend = () => btn.classList.remove('active');
-      utter.onerror = () => btn.classList.remove('active');
-      window.speechSynthesis.speak(utter);
+  speakRussianText(btn, rawText, msgId) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Синтез речи не поддерживается вашим браузером.');
+      return;
     }
+    const idStr = String(msgId);
+    if (btn.dataset.speaking === '1') {
+      window.speechSynthesis.cancel();
+      this.container.querySelectorAll('.msg-tts-btn').forEach((b) => {
+        b.dataset.speaking = '0';
+        b.classList.remove('active');
+        b.textContent = 'Озвучить';
+      });
+      return;
+    }
+
+    const cleanText = String(rawText || '')
+      .replace(/\[D\d+\]/g, '')
+      .replace(/[*#_`~>|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleanText) return;
+
+    window.speechSynthesis.cancel();
+    this.container.querySelectorAll('.msg-tts-btn').forEach((b) => {
+      b.dataset.speaking = '0';
+      b.classList.remove('active');
+      b.textContent = 'Озвучить';
+    });
+
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.lang = 'ru-RU';
+    const selectedVoice = store.getState().voice || 'baya';
+    const isMale = selectedVoice === 'aidar' || selectedVoice === 'eugene';
+    utter.pitch = isMale ? 0.85 : (selectedVoice === 'kseniya' ? 1.08 : 1.0);
+    utter.rate = selectedVoice === 'eugene' ? 0.96 : 1.02;
+
+    const voices = window.speechSynthesis.getVoices() || [];
+    const ruVoices = voices.filter((v) => (v.lang || '').toLowerCase().startsWith('ru'));
+    if (ruVoices.length) {
+      const preferred = ruVoices.find((v) => {
+        const n = (v.name || '').toLowerCase();
+        return isMale ? (n.includes('yuri') || n.includes('dmitry') || n.includes('pavel')) : (n.includes('milena') || n.includes('irina') || n.includes('svetlana') || n.includes('katya'));
+      });
+      utter.voice = preferred || ruVoices[0];
+    }
+
+    btn.dataset.speaking = '1';
+    btn.classList.add('active');
+    btn.textContent = 'Стоп ⏹';
+    const resetBtn = () => {
+      if (btn.dataset.msgId === idStr) {
+        btn.dataset.speaking = '0';
+        btn.classList.remove('active');
+        btn.textContent = 'Озвучить';
+      }
+    };
+    utter.onend = resetBtn;
+    utter.onerror = resetBtn;
+    window.speechSynthesis.speak(utter);
   }
 
   openReportDialog(sessionId, msg) {
@@ -557,10 +616,21 @@ export class Chat {
   }
 
   bindMessageActions(list, sessionId, messages) {
-    const findMsg = (id) => messages.find((m) => m.id === id);
+    const findMsg = (id) => messages.find((m) => String(m.id) === String(id));
+
+    const copyFallback = (text) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    };
 
     list.querySelectorAll('.msg-copy-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const msg = findMsg(btn.dataset.msgId);
         if (!msg) return;
         const d = msg.data || {};
@@ -569,10 +639,17 @@ export class Chat {
           d.message || msg.text,
           rec ? `${rec.medicine_name}: ${rec.dosage}` : '',
         ].filter(Boolean).join('\n\n');
-        navigator.clipboard?.writeText(copyText).then(() => {
-          btn.textContent = 'Скопировано ✓';
-          setTimeout(() => { btn.textContent = 'Копировать'; }, 1400);
-        }).catch(() => {});
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(copyText);
+          } else {
+            copyFallback(copyText);
+          }
+        } catch {
+          copyFallback(copyText);
+        }
+        btn.textContent = 'Скопировано ✓';
+        setTimeout(() => { btn.textContent = 'Копировать'; }, 1400);
       });
     });
 
@@ -580,16 +657,26 @@ export class Chat {
       btn.addEventListener('click', async () => {
         const msg = findMsg(btn.dataset.msgId);
         if (!msg) return;
-        const textToRead = (msg.data && msg.data.message) || msg.text || '';
+        const d = msg.data || {};
+        const rec = d.recommendation;
+        const textToRead = [
+          d.message || msg.text || '',
+          rec && !d.message ? `${rec.medicine_name}. ${rec.dosage}` : '',
+        ].filter(Boolean).join('. ');
+
+        if (btn.dataset.speaking === '1') {
+          this.speakRussianText(btn, textToRead, msg.id);
+          return;
+        }
         if (store.isAuthenticated() && sessionId && msg.serverMessageId) {
           const res = await dialogsApi.requestAudio(sessionId, msg.serverMessageId, store.getState().voice);
           if (res && !res._fallback && !res._error && res.audio_url) {
             const audio = new Audio(res.audio_url);
-            audio.play().catch(() => this.speakRussianText(btn, textToRead));
+            audio.play().catch(() => this.speakRussianText(btn, textToRead, msg.id));
             return;
           }
         }
-        this.speakRussianText(btn, textToRead);
+        this.speakRussianText(btn, textToRead, msg.id);
       });
     });
 
@@ -646,6 +733,7 @@ export class Chat {
 
   render() {
     const depth = store.getState().responseDepth;
+    const voice = store.getState().voice || 'baya';
     this.container.innerHTML = `
       <div class="chat-view-wrap">
         <div id="chatReportNewsBanner" class="chat-report-news-banner" style="display: none;"></div>
@@ -655,12 +743,22 @@ export class Chat {
         <!-- Зона ввода сообщения -->
         <div class="chat-input-area">
           <div class="chat-composer-meta">
-            <span style="font-size: 11.5px; color: var(--text-muted);">
-              Глубина ответа:
-            </span>
-            <div class="chat-depth-switcher">
-              <button type="button" class="chat-depth-btn ${depth === 'brief' ? 'active' : ''}" data-depth="brief">Кратко</button>
-              <button type="button" class="chat-depth-btn ${depth === 'detailed' ? 'active' : ''}" data-depth="detailed">Подробно</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11.5px; color: var(--text-muted);">Глубина:</span>
+              <div class="chat-depth-switcher">
+                <button type="button" class="chat-depth-btn ${depth === 'brief' ? 'active' : ''}" data-depth="brief">Кратко</button>
+                <button type="button" class="chat-depth-btn ${depth === 'detailed' ? 'active' : ''}" data-depth="detailed">Подробно</button>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11.5px; color: var(--text-muted);">Голос:</span>
+              <select id="chatVoiceSelect" style="font-size: 11.5px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--brand-dark); font-weight: 600;">
+                <option value="baya" ${voice === 'baya' ? 'selected' : ''}>Baya</option>
+                <option value="kseniya" ${voice === 'kseniya' ? 'selected' : ''}>Kseniya</option>
+                <option value="xenia" ${voice === 'xenia' ? 'selected' : ''}>Xenia</option>
+                <option value="aidar" ${voice === 'aidar' ? 'selected' : ''}>Aidar</option>
+                <option value="eugene" ${voice === 'eugene' ? 'selected' : ''}>Eugene</option>
+              </select>
             </div>
           </div>
 
