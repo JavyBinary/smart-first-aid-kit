@@ -277,6 +277,13 @@
       } else if (typeof err?.detail === 'string') {
         msg = err.detail;
       }
+      if (/too many attempts/i.test(msg)) {
+        msg = 'Слишком много попыток с одного IP-адреса. Подождите немного и повторите.';
+      } else if (/already exists|already registered|login taken/i.test(msg)) {
+        msg = 'Аккаунт с таким email уже зарегистрирован — перейдите на вкладку «Вход».';
+      } else if (/invalid credentials/i.test(msg)) {
+        msg = 'Неверный email или пароль.';
+      }
       errorBox.textContent = msg;
       errorBox.style.display = 'block';
     }
