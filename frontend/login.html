@@ -185,6 +185,8 @@
       <button class="login-tab-btn" id="tabRegister">Регистрация</button>
     </div>
 
+    <div id="authErrorBox" style="display:none; margin-bottom:14px; padding:10px 14px; border-radius:10px; background:#FEF2F2; border:1px solid #FECACA; color:#B91C1C; font-size:13px; font-weight:500;"></div>
+
     <!-- Форма входа -->
     <form id="loginForm">
       <div class="form-group">
@@ -261,8 +263,46 @@
     const tabRegister = document.getElementById('tabRegister');
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
+    const errorBox = document.getElementById('authErrorBox');
+
+    function showAuthError(err) {
+      if (!errorBox) return;
+      let msg = 'Не удалось выполнить запрос.';
+      if (typeof err === 'string' && err.trim()) {
+        msg = err;
+      } else if (Array.isArray(err?.detail) && err.detail.length) {
+        msg = err.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+      } else if (typeof err?._error === 'string') {
+        msg = err._error;
+      } else if (typeof err?.detail === 'string') {
+        msg = err.detail;
+      }
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }
+
+    function clearAuthError() {
+      if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+      }
+    }
+
+    function saveUserAndRedirect(user) {
+      localStorage.removeItem('medai_token');
+      localStorage.removeItem('medai_sessions');
+      localStorage.removeItem('medai_health_profile');
+      localStorage.setItem('medai_user', user.email);
+      localStorage.setItem('medai_name', user.name || 'Пользователь');
+      localStorage.setItem('medai_role', user.role || 'user');
+      if (user.avatar) localStorage.setItem('medai_avatar', user.avatar);
+      else localStorage.removeItem('medai_avatar');
+
+      window.location.href = (user.role === 'admin' || user.role === 'superadmin') ? 'admin.html' : 'index.html';
+    }
 
     tabLogin.addEventListener('click', () => {
+      clearAuthError();
       tabLogin.classList.add('active');
       tabRegister.classList.remove('active');
       loginForm.style.display = 'block';
@@ -270,6 +310,7 @@
     });
 
     tabRegister.addEventListener('click', () => {
+      clearAuthError();
       tabRegister.classList.add('active');
       tabLogin.classList.remove('active');
       registerForm.style.display = 'block';
@@ -278,31 +319,47 @@
 
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim();
-      const pass = document.getElementById('loginPass').value;
-      const res = await authApi.login(email, pass);
+      clearAuthError();
+      const btn = loginForm.querySelector('.submit-btn');
+      const prevText = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Выполняется вход...'; }
+      try {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pass = document.getElementById('loginPass').value;
+        const res = await authApi.login(email, pass);
+        const user = res && res.user ? res.user : res;
 
-      localStorage.setItem('medai_token', res.token);
-      localStorage.setItem('medai_user', res.user.email);
-      localStorage.setItem('medai_name', res.user.name);
-      localStorage.setItem('medai_role', res.user.role);
-
-      window.location.href = (res.user.role === 'admin' || res.user.role === 'superadmin') ? 'admin.html' : 'index.html';
+        if (!res || res._fallback || res._ok === false || (res._status && res._status >= 400) || !user || !user.email) {
+          showAuthError(res);
+          return;
+        }
+        saveUserAndRedirect(user);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = prevText; }
+      }
     });
 
     registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('regName').value.trim();
-      const email = document.getElementById('regEmail').value.trim();
-      const pass = document.getElementById('regPass').value;
-      const res = await authApi.register(name, email, pass);
+      clearAuthError();
+      const btn = registerForm.querySelector('.submit-btn');
+      const prevText = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Создание аккаунта...'; }
+      try {
+        const name = document.getElementById('regName').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const pass = document.getElementById('regPass').value;
+        const res = await authApi.register(name, email, pass);
+        const user = res && res.user ? res.user : res;
 
-      localStorage.setItem('medai_token', res.token);
-      localStorage.setItem('medai_user', res.user.email);
-      localStorage.setItem('medai_name', res.user.name);
-      localStorage.setItem('medai_role', res.user.role);
-
-      window.location.href = 'index.html';
+        if (!res || res._fallback || res._ok === false || (res._status && res._status >= 400) || !user || !user.email) {
+          showAuthError(res);
+          return;
+        }
+        saveUserAndRedirect(user);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = prevText; }
+      }
     });
   </script>
 </body>
