@@ -27,7 +27,7 @@ __all__ = [
     "utc_now",
 ]
 
-_CONTEXT_NAMES = ("request_id", "dialog_id")
+_CONTEXT_NAMES = ("request_id", "dialog_id", "call_id")
 _CONTEXT = {name: ContextVar[str | None](name, default=None) for name in _CONTEXT_NAMES}
 
 _SAFE_FIELDS = frozenset(
