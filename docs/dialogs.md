@@ -54,4 +54,4 @@ sequenceDiagram
 
 - **Оценка ответа (`1..5`):** `PUT /api/v1/dialogs/{id}/messages/{msg_id}/feedback` фиксирует оценку в `message_feedback` для аналитики в Admin 2.0.
 - **Жалобы и уведомления:** `POST .../report` создает тикет в `message_reports`; после модерации администратором клиент получает уведомление через `GET /api/v1/reports/news` и подтверждает прочтение (`POST /api/v1/reports/news/seen`).
-- **Озвучивание (`POST .../audio`):** серверный маршрутизатор озвучки (или возврат `503`, при котором UI прозрачно использует встроенный синтез речи браузера `SpeechSynthesis` на русском языке).
+- **Озвучивание (`POST .../audio` и `POST /api/v1/speech/synthesize`):** нейросетный синтез MP3 на базе `edge-tts` для 5 русских голосов (`baya`, `kseniya`, `xenia` — женские; `aidar`, `eugene` — мужские) с переключением прямо в чате; при `SPEECH_ENABLED=false` (`503`) клиентский UI прозрачно откатывается на встроенный `SpeechSynthesis`.

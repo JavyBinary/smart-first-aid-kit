@@ -5,7 +5,7 @@
 ---
 
 ## [0.5.0-kt2-hybrid-agent-admin] — 2026-11-26
-### Гибридный RAG в PostgreSQL, Agent Runtime (LiteLLM), Redis Security и Admin 2.0 (Ветка: feat/kt2-backend-rag)
+### Гибридный RAG в PostgreSQL, Agent Runtime (LiteLLM), Redis Security и Admin 2.0 (Ветка: main)
 
 #### Добавлено и улучшено:
 - **PostgreSQL RAG, гибридный поиск и честный бенчмарк (SDD 024):**
@@ -13,13 +13,14 @@
   - Контекстное структурированное чанкирование (`chunking.py`), расширение синонимами + плотные эмбеддинги + RRF (`embeddings.py`, `hybrid.py`), Set-based PostgreSQL хранилище (`rag/postgres.py`), CLI `medai.rag` (`check/load/export/delete/restore/search/benchmark`).
   - Исправлен баг отсечения вопросов-ловушек в `benchmark.py`, добавлены `Context Precision`, `Accuracy`, `Faithfulness` (`benchmark_llm.py`) и абляционный анализ `BM25 vs Dense vs Hybrid` на 30 запросах.
 - **Agent Runtime, LiteLLM и медицинская безопасность (SDD 025):**
-  - Асинхронный streaming-провайдер `LiteLLMProvider` и цикл `Agent` + `ToolRegistry` (`backend/src/medai/agent/`), версионированный `prompts/system.md`.
+  - Асинхронный streaming-провайдер `LiteLLMProvider` (проверен на живом инференсе `groq/openai/gpt-oss-120b`) и цикл `Agent` + `ToolRegistry` (`backend/src/medai/agent/`), версионированный `prompts/system.md`, поддержка `call_id` в контекстном логгере `observability.py`.
   - Инструменты безопасности `medical_tools.py`: `search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions` (проверка аллергий, гастрита/язвы, дублей МНН, просрочки и возраста).
   - Двухслойная защита `guardrails.py`: детекция Prompt Injection (`detect_prompt_injection`), Red Flags (`112`), Out-of-Domain и Output Grounding (`verify_output_grounding`), а также интеллектуальный детерминированный fallback при отсутствии `LLM_API_KEY`.
 - **Сквозная интеграция, Redis, CSRF, TTS и Admin 2.0 (SDD 026):**
   - `RedisRateLimiter`, `RedisTokenBlacklist` (`cache/`), `ForbiddenOriginMiddleware` (`security.py`), `POST /auth/change-password`, `PATCH /auth/admin/users/{id}/role`.
-  - Эндпоинты `/api/v1/admin/*` (статистика 7/30/90, модерация жалоб, CRUD корпуса лекарств, живой benchmark) и `/api/v1/dialogs/.../audio`.
-  - Полная синхронизация SPA (`frontend/src/`): auto-refresh на `401`, честные `4xx`, сериализация аптечки (`tags`, `status`) и медкарты (`/profile`), SSE-стриминг диалогов, оценки `1..5`, жалобы, озвучка, подсказки-чипсы, глубина ответа, аудит и экспорт памятки аптечки, таймер ожога и живая панель администратора (`frontend/admin.html`, `frontend/src/admin.js`).
+  - Эндпоинты `/api/v1/admin/*` (статистика 7/30/90, модерация жалоб, CRUD корпуса лекарств, живой benchmark), реальный многоголосный нейросетный синтез речи `edge-tts` (`POST /api/v1/speech/synthesize`, `POST/GET /dialogs/{id}/messages/{msg_id}/audio` для `baya`, `kseniya`, `xenia`, `aidar`, `eugene`) и шаблон `docker/.env.example`.
+  - Полная синхронизация SPA (`frontend/src/` и `login.html`): auto-refresh на `401`, честные `4xx` с локализацией ошибок входа/регистрации, сериализация аптечки (`tags`, `status`) и медкарты (`/profile`), SSE-стриминг диалогов, оценки `1..5`, жалобы, переключатель 5 голосов озвучки, подсказки-чипсы, глубина ответа, аудит и экспорт памятки аптечки, таймер ожога и живая панель администратора (`frontend/admin.html`, `frontend/src/admin.js`).
+  - Актуализированы `README.md`, `backend/README.md` и архитектурный каталог `docs/`.
 
 ---
 

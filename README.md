@@ -1,6 +1,6 @@
 # MedAI — Умная домашняя аптечка
 
-Интеллектуальный веб-сервис персональной инвентаризации домашней аптечки и безопасного подбора средств доврачебной помощи на базе алгоритма **BM25** и **LLM**.
+Интеллектуальный веб-сервис персональной инвентаризации домашней аптечки и безопасного подбора средств доврачебной помощи на базе **Hybrid RAG (BM25 + Dense Embeddings + RRF)** и **LLM Agent Runtime (LiteLLM)**.
 
 Проект разрабатывается в рамках научно-исследовательской работы студентов (НИРС 2026, МГТУ им. Н. Э. Баумана, факультет ИУ, кафедра ИУ5).  
 Дисциплина: *Разработка RAG-приложения с помощью LLM*.  
@@ -11,83 +11,68 @@
 
 ## 1. Команда и роли
 
-- **Лука (Тимлид):** Архитектура SDD, разработка базовых спецификаций, ядро BM25, токенизация и лемматизация (`pymorphy3`), бенчмаркинг ($MRR$, $Recall@k$).
-- **Полина:** Backend & API, ревью и валидация спецификации REST API, реализация серверного слоя на FastAPI, интеграция с LLM, база данных PostgreSQL.
-- **Катя:** Frontend & UI/UX, дизайн-система и клиентский интерфейс (`ui/auth.html`, `ui/site.html`, `ui/admin.html`). Разработка интерфейса ведется в отдельной ветке.
+- **Лука (Тимлид):** Архитектура SDD, ядро BM25 + Hybrid RAG (чанкирование, `pymorphy3`, Dense + RRF, `pg_trgm`), бенчмаркинг ($MRR$, $Recall@k$, Accuracy, Faithfulness).
+- **Полина:** Backend & API на FastAPI, Agent Runtime + LiteLLM, инструменты клинической безопасности, PostgreSQL/Alembic, Redis security, Admin 2.0, TTS.
+- **Катя:** Дизайн-система и клиентский интерфейс КТ1 (`ui/auth.html`, `ui/site.html`, `ui/admin.html`) и модульный SPA-контур (`frontend/`).
 
 ---
 
-## 2. Быстрый старт (Makefile)
+## 2. Быстрый старт (Docker & Makefile)
 
-Единой точкой входа для команд разработки является [Makefile](Makefile):
+Единой точкой входа служит [Makefile](Makefile):
 
 ```bash
-# Просмотр всех доступных команд
-make help
+# 1. Скопируйте шаблон переменных окружения (при желании укажите LLM_API_KEY от Groq/OpenRouter/OpenAI)
+cp docker/.env.example docker/.env
 
-# Запуск модульного веб-интерфейса SPA (порт 8000)
-make run-ui
+# 2. Запустите полный контур (PostgreSQL 17, Redis 7, migrate + загрузка 30 лекарств, Backend, Frontend, Caddy)
+make run
 
-# Запуск Vite Dev Server для быстрой разработки фронтенда
-make dev-frontend
-
-# Просмотр статусов спецификаций SDD
+# 3. Просмотрите статусы спецификаций SDD и запустите проверки качества
 make spec-list
+make lint
+make test
+make test-integration
+make bench
 ```
 
-Экраны сервиса:
-- Модульный SPA-интерфейс (Кабинет, Чат, Аптека, Медкарта): `http://localhost:8000` (каталог `frontend/`)
-- Экран входа и регистрации: `http://localhost:8000/login.html`
-- Панель администратора: `http://localhost:8000/admin.html`
-- Базовые макеты КТ1 (дизайн Кати): каталог `ui/` (`ui/auth.html`, `ui/site.html`, `ui/admin.html`)
+Сервис после `make run` доступен через обратный прокси Caddy на **`http://localhost:8090`**:
+- **Чат, домашняя аптечка и медкарта:** `http://localhost:8090/`
+- **Вход и регистрация:** `http://localhost:8090/login.html`
+- **Панель администратора 2.0:** `http://localhost:8090/admin.html` (создание администратора: `make create-admin EMAIL=<email> ROLE=superadmin`)
 
 ---
 
-## 3. Структура репозитория
+## 3. Ключевые возможности системы
+
+1. **Hybrid RAG в PostgreSQL (`backend/src/medai/rag/`):**
+   - Собственная реализация **BM25** ($k_1 = 1.5$, $b = 0.75$) с русской лемматизацией `pymorphy3`.
+   - Структурированное контекстное чанкирование, расширение синонимами, плотные эмбеддинги + **Reciprocal Rank Fusion (RRF)** и нечёткий поиск по триграммам `pg_trgm`.
+   - CLI управления корпусом (`check`, `load`, `export`, `delete`, `restore`, `search`, `benchmark`) и версионирование ревизий в PostgreSQL (`rag_loads`, `rag_revisions`).
+2. **Агент, LLM и медицинская безопасность (`backend/src/medai/agent/`):**
+   - Потоковый `LiteLLMProvider` (OpenAI, Groq, OpenRouter, Ollama) + `Agent` и `ToolRegistry` (`search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`).
+   - Автоматический перекрёстный контроль **аллергий, хронических заболеваний (гастрит/язва), дублей действующих веществ (Парацетамол + Пенталгин) и сроков годности**.
+   - Двухслойные `Guardrails`: защита от Prompt Injection, экстренные протоколы 112 (Red Flags + 15-минутный таймер при ожоге), отсечение нецелевых запросов (`out_of_domain`) и безопасный fallback при отсутствии `LLM_API_KEY`.
+3. **Аутентификация, CSRF, TTS и Admin 2.0:**
+   - `HttpOnly` cookie JWT (Argon2id + SHA-256 refresh rotation), `RedisRateLimiter`, `RedisTokenBlacklist` и `ForbiddenOriginMiddleware` (`Sec-Fetch-Site`).
+   - Нейросетный синтез речи MP3 (`edge-tts`: 5 русских голосов `baya`, `kseniya`, `xenia`, `aidar`, `eugene`) с клиентским fallback на браузерный `SpeechSynthesis`.
+   - Живая панель администратора на данных PostgreSQL: статистика `7/30/90`, оценки `1..5`, модерация жалоб, CRUD корпуса лекарств и живой Ablation-бенчмарк.
+
+---
+
+## 4. Структура репозитория
 
 ```text
-├── Makefile                       # Единый фасад команд сборки, запуска и тестов
-├── README.md                      # Паспорт проекта и быстрый старт
-├── AGENTS.md                      # Инженерный регламент и рабочий цикл SDD
-├── GEMINI.md                      # Системный регламент AI-ассистента
-├── CHANGE_HISTORY.md              # Журнал версий по стандарту Keep a Changelog
-├── .agents/skills/sdd/            # Локальный skill для ведения процесса SDD
-│   ├── SKILL.md                   # Руководство цикла specify -> plan -> implement -> verify
-│   ├── scripts/spec_status.py     # CLI-инструмент управления реестром specs/status.yaml
-│   └── references/                # Шаблоны спецификаций, планов и верификаций
-├── docs/                          # Актуальный архитектурный каталог и контракты
-│   ├── README.md                  # Навигационная карта архитектуры
-│   ├── architecture.md            # Компонентная структура, Data Flow, Seamless Fallback
-│   ├── bm25.md                    # Математический аппарат BM25 и конвейер предобработки
-│   ├── rag.md                     # Конвейер Context Injection и схема ответа
-│   ├── benchmark.md               # Метрики качества (MRR, Recall@k) и golden dataset
-│   ├── api.md                     # Контракты REST API (FastAPI)
-│   ├── roles.md                   # Модель RBAC (User / Admin)
-│   └── ui.md                      # Дизайн-система Каты и сценарии экранов
-├── frontend/                      # Модульный клиентский SPA-интерфейс (ESM + CSS Tokens)
-│   ├── index.html                 # Главный экран (Мультичат + Аптека + Медкарта)
-│   ├── login.html                 # Экран авторизации и регистрации
-│   ├── admin.html                 # Панель управления базой знаний
-│   └── src/
-│       ├── app.js                 # Точка входа SPA-приложения
-│       ├── api/                   # Модули API-клиентов (Chat, Kit, Auth)
-│       ├── state/                 # Реактивный стор Store.js с шиной событий
-│       ├── components/            # Модульные компоненты (Chat, Kit, Catalog, Mascot и др.)
-│       └── styles/                # CSS-токены, анимации, адаптивная сетка и модальные окна
-├── specs/                         # Реестр и архивы изменений SDD
-│   ├── status.yaml                # Машиночитаемый реестр статусов спецификаций
-│   └── changes/                   # Атомарные пакеты изменений (001–016)
-└── ui/                            # Клиентский интерфейс КТ1 (автор макетов — Катя)
-    ├── auth.html                  # Экран авторизации и регистрации
-    ├── site.html                  # Кабинет пользователя (аптечка и чат)
-    └── admin.html                 # Панель администратора корпуса
+├── Makefile                   # Единый фасад сборки, тестов, миграций, CLI и бенчмарка
+├── README.md                  # Паспорт проекта и быстрый старт
+├── AGENTS.md                  # Инженерный регламент и цикл SDD
+├── GEMINI.md                  # Системный регламент AI-ассистентов
+├── CHANGE_HISTORY.md          # Хронология релизов (Keep a Changelog)
+├── backend/                   # Серверный контур (FastAPI, Agent, RAG, Postgres, Redis, TTS, Pytest)
+├── data/                      # Медицинский корпус (30 препаратов) и датасеты бенчмарка (15 и 30 запросов)
+├── docker/                    # compose.yaml, compose.test.yaml, Dockerfile, Caddyfile, .env.example
+├── docs/                      # Архитектурный каталог, ERD, контракты API, формулы BM25/RRF и Benchmark
+├── frontend/                  # Модульный SPA (index.html, login.html, admin.html, src/, tests/)
+├── specs/                     # Реестр статусов (status.yaml) и пакеты спецификаций SDD (001–026)
+└── ui/                        # Утвержденный интерфейс КТ1 (дизайн Каты)
 ```
-
----
-
-## 4. Архитектурный каталог (docs/) и реестр спецификаций (specs/)
-
-- Актуальные контракты и архитектура: каталог [docs/](docs/).
-- Реестр задач и верификаций SDD: каталог [specs/](specs/).
-- Регламент работы AI-ассистентов: [AGENTS.md](AGENTS.md).
-- Журнал релизов и изменений: [CHANGE_HISTORY.md](CHANGE_HISTORY.md).

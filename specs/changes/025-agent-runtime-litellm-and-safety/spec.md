@@ -16,7 +16,7 @@
 - **REQ-006 (Integration with DialogService):** Подключить `Agent` в `DialogService` (и SSE-стриминг, и `/chat/query` с персонализированным контекстом аптечки и медкарты) с безопасным интеллектуальным fallback-синтезатором при отсутствии `LLM_API_KEY`.
 
 ## Критерии приемки
-- [ ] Стриминговый ответ `Agent.run` работает и с `FakeLLMProvider`, и с `LiteLLMProvider`.
-- [ ] `check_drug_interactions` детектирует дублирование действующего вещества (Парацетамол + Терафлю) и конфликты с аллергиями/гастритом.
-- [ ] Prompt injection атаки блокируются на входе `detect_prompt_injection`.
-- [ ] Все тесты (`make test`) и линтер (`make lint`) пройдены.
+- [x] Стриминговый ответ `Agent.run` работает и с `FakeLLMProvider`, и с `LiteLLMProvider`.
+- [x] `check_drug_interactions` детектирует дублирование действующего вещества (Парацетамол + Терафлю) и конфликты с аллергиями/гастритом.
+- [x] Prompt injection атаки блокируются на входе `detect_prompt_injection`.
+- [x] Все тесты (`make test`) и линтер (`make lint`) пройдены.

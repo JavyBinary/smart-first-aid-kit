@@ -18,6 +18,6 @@
   - Расширить набор запросов `data/benchmark_queries.yaml` вопросами на совместимость, аббревиатуры и конфликты, сохранив совместимость с КТ2.
 
 ## Критерии приемки
-- [ ] `make knowledge-load` загружает пакет `data/medicines/package.yaml` в PostgreSQL и/или валидирует целостность.
-- [ ] `make bench` выводит сравнительную таблицу `BM25` vs `Hybrid (RRF)`, честный `Correct Rejection Rate` и `Accuracy`.
-- [ ] Все unit-тесты (`make test`) и линтер (`make lint`) пройдены без ошибок.
+- [x] `make knowledge-load` загружает пакет `data/medicines/package.yaml` в PostgreSQL и/или валидирует целостность.
+- [x] `make bench` выводит сравнительную таблицу `BM25` vs `Hybrid (RRF)`, честный `Correct Rejection Rate` и `Accuracy`.
+- [x] Все unit-тесты (`make test`) и линтер (`make lint`) пройдены без ошибок.

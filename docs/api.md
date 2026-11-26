@@ -47,7 +47,8 @@
 - `PUT /api/v1/dialogs/{id}/messages/{msg_id}/feedback`: `{score: 1..5}` $\rightarrow$ `204`; `DELETE .../feedback` $\rightarrow$ `204`.
 - `POST /api/v1/dialogs/{id}/messages/{msg_id}/report`: `{reason, comment?}` $\rightarrow$ `201 {report_id}`.
 - `GET /api/v1/reports/news` $\rightarrow$ `{news: [{report_id, dialog_id, dialog_title}]}` и `POST /api/v1/reports/news/seen`: `{report_ids}`.
-- `POST /api/v1/dialogs/{id}/messages/{msg_id}/audio`: `{voice}` $\rightarrow$ `202` или `503` (если модель TTS не смонтирована; клиент использует fallback Web Speech API).
+- `POST /api/v1/dialogs/{id}/messages/{msg_id}/audio`: `{voice}` $\rightarrow$ `202` (`{status: "ready", voice, audio_url}` с последующей отдачей MP3 по `GET .../audio?voice=...` при `SPEECH_ENABLED=true`) или `503` (если серверный TTS отключен; клиент использует fallback Web Speech API).
+- `POST /api/v1/speech/synthesize`: `{text, voice}` $\rightarrow$ `200 audio/mpeg` (нейросетный синтез MP3 через `edge-tts` для 5 голосов `baya`, `kseniya`, `xenia`, `aidar`, `eugene`) или `503`.
 - `POST /api/v1/chat/query` — синхронный RAG+Agent фасад для гостевого режима и резервного ответа.
 
 ---
