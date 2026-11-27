@@ -70,11 +70,11 @@ class InMemoryKitStore(KitStore):
         current = user_kit[item_id]
         updated = KitItem.create(
             id=current.id,
-            name=current.name,
+            name=req.name if req.name is not None else current.name,
             dosage=req.dosage if req.dosage is not None else current.dosage,
-            form=current.form,
-            category=current.category,
-            tags=current.tags,
+            form=req.form if req.form is not None else current.form,
+            category=req.category if req.category is not None else current.category,
+            tags=req.tags if req.tags is not None else current.tags,
             quantity=req.quantity if req.quantity is not None else current.quantity,
             expiry=req.expiry if req.expiry is not None else current.expiry,
             status=req.status if req.status is not None else current.status,

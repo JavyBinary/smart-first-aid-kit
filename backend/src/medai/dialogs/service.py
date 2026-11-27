@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -79,6 +80,41 @@ DISCLAIMER_TEXT = (
     "Информация носит ознакомительный доврачебный характер. "
     "При сохранении симптомов свыше 2 дней обратитесь к врачу."
 )
+
+_MD_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)
+_MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*|__(.+?)__")
+_MD_ITALIC_STAR_RE = re.compile(r"(?<!\w)\*([^*\n]+?)\*(?!\w)")
+_MD_CODE_RE = re.compile(r"`([^`]+?)`")
+
+
+def strip_markdown(text: str) -> str:
+    """Remove Markdown formatting tokens while keeping readable plain text structure."""
+    if not text:
+        return text
+    cleaned = _MD_HEADING_RE.sub("", text)
+    cleaned = _MD_BOLD_RE.sub(lambda m: m.group(1) if m.group(1) is not None else m.group(2), cleaned)
+    cleaned = _MD_ITALIC_STAR_RE.sub(r"\1", cleaned)
+    cleaned = _MD_CODE_RE.sub(r"\1", cleaned)
+    cleaned = cleaned.replace("**", "").replace("__", "")
+    cleaned = re.sub(r"^\s*\|\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\s*\|\s*$", "", cleaned, flags=re.MULTILINE)
+    return cleaned.strip()
+
+
+def _matches_kit_item(doc: MedicineDocument, item_name: str) -> bool:
+    norm_name = normalize_text(item_name)
+    if not norm_name:
+        return False
+    norm_title = normalize_text(doc.title)
+    norm_inn = normalize_text(doc.inn)
+    if norm_name in norm_title or norm_title in norm_name or norm_name in norm_inn:
+        return True
+    for part in norm_inn.split("+"):
+        p = part.strip()
+        if len(p) >= 4 and p in norm_name:
+            return True
+    first_word = norm_title.split("(")[0].strip().split()[0] if norm_title else ""
+    return len(first_word) >= 4 and first_word in norm_name
 
 
 class DialogService:
@@ -246,6 +282,7 @@ class DialogService:
         owner_id: UUID | None,
         *,
         kit_names_override: list[str] | None = None,
+        kit_items_override: list[dict[str, Any]] | None = None,
         health_override: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         kit_items: list[dict[str, Any]] = []
@@ -259,8 +296,10 @@ class DialogService:
                         {
                             "name": it.name,
                             "dosage": it.dosage,
+                            "form": it.form,
                             "expiry": it.expiry,
                             "is_expired": it.is_expired,
+                            "status": it.status,
                         }
                         for it in stored_items
                     ]
@@ -273,6 +312,19 @@ class DialogService:
                 except Exception:
                     logger.warning("Failed to load health profile for %s", owner_id)
 
+        if not kit_items and kit_items_override:
+            for raw in kit_items_override:
+                if isinstance(raw, dict) and raw.get("name"):
+                    kit_items.append(
+                        {
+                            "name": str(raw.get("name")),
+                            "dosage": raw.get("dosage") or "",
+                            "form": raw.get("form") or "",
+                            "expiry": raw.get("expiry") or "",
+                            "is_expired": bool(raw.get("is_expired", False)),
+                            "status": raw.get("status") or "otc",
+                        }
+                    )
         if not kit_items and kit_names_override:
             kit_items = [{"name": n, "is_expired": False} for n in kit_names_override if n]
 
@@ -370,23 +422,46 @@ class DialogService:
                 "disclaimer": DISCLAIMER_TEXT,
             }
 
-        # 1. Resolve explicitly selected pills first (e.g. "что это", interactions check)
+        # 1. Resolve explicitly selected pills first and search wider candidate pool so kit medicines are prioritized
         pill_results = self._find_docs_for_pills(selected_pills or [])
         symptom_results = self._hybrid_index.search_hybrid(
-            query, top_k=3, bm25_min_gate=5.0
+            query, top_k=8, bm25_min_gate=4.5
         )
 
         # Combine pill results & symptom results uniquely
-        search_results: list[SearchResult] = []
+        combined_results: list[SearchResult] = []
         seen_ids: set[str] = set()
         for r in pill_results + symptom_results:
             if r.doc_id not in seen_ids:
                 seen_ids.add(r.doc_id)
-                search_results.append(r)
+                combined_results.append(r)
 
         # Compatibility fallback for callers passing pill names only via user_kit_names with vague query
-        if not search_results and user_kit_names:
-            search_results = self._find_docs_for_pills(user_kit_names)
+        if not combined_results and user_kit_names:
+            combined_results = self._find_docs_for_pills(user_kit_names)
+
+        # Prioritize valid (non-expired) medicines present in the user's first aid kit
+        effective_kit = kit_items or [{"name": n, "is_expired": False} for n in (user_kit_names or [])]
+        pill_id_set = {r.doc_id for r in pill_results}
+
+        def _kit_priority(sr: SearchResult) -> tuple[int, float]:
+            if sr.doc_id in pill_id_set:
+                return (0, -sr.score)
+            matching_kit = [it for it in effective_kit if _matches_kit_item(sr.document, str(it.get("name", "")))]
+            if matching_kit:
+                has_valid = any(not it.get("is_expired") for it in matching_kit)
+                cand_warns = analyze_medicine_safety(
+                    [sr.document], health_profile=health_profile, user_kit_items=effective_kit
+                )
+                has_severe = any("АЛЛЕРГИЯ" in w or "ПРОСРОЧЕНО" in w or "МЕДКАРТА" in w for w in cand_warns)
+                if has_valid and not has_severe:
+                    return (1, -sr.score)
+                if has_valid:
+                    return (2, -sr.score)
+                return (4, -sr.score)
+            return (3, -sr.score)
+
+        search_results = sorted(combined_results, key=_kit_priority)
 
         if not search_results:
             return {
@@ -430,11 +505,7 @@ class DialogService:
             for r in search_results[:3]
         ]
 
-        kit_lookup = [n.lower() for n in (user_kit_names or [])]
-        in_kit = any(
-            chosen_doc.inn.lower() in k or k in chosen_doc.title.lower()
-            for k in kit_lookup
-        )
+        in_kit = any(_matches_kit_item(chosen_doc, str(n)) for n in (user_kit_names or []))
 
         indications_str = ", ".join(chosen_doc.indications[:4])
         contraindications_str = (
@@ -450,28 +521,28 @@ class DialogService:
 
         warn_block = ""
         if safety_warnings:
-            warn_block = "\n\n**Предупреждения по вашей медкарте и аптечке:**\n" + "\n".join(
+            warn_block = "\n\nПредупреждения по вашей медкарте и аптечке:\n" + "\n".join(
                 f"- {w}" for w in safety_warnings
             )
 
         if response_depth == "brief":
             full_text = (
-                f"[{chosen_doc.id}] **{chosen_doc.title}** ({chosen_doc.inn}) — {chosen_doc.category}.\n"
-                f"**Дозировка:** {chosen_doc.dosage}"
-                f"{warn_block}\n\n*{DISCLAIMER_TEXT}*"
+                f"[{chosen_doc.id}] {chosen_doc.title} ({chosen_doc.inn}) — {chosen_doc.category}.\n"
+                f"Дозировка: {chosen_doc.dosage}"
+                f"{warn_block}\n\n{DISCLAIMER_TEXT}"
             )
         else:
             full_text = (
-                f"По результатам анализа рекомендован препарат **[{chosen_doc.id}] {chosen_doc.title}** "
+                f"По результатам анализа рекомендован препарат [{chosen_doc.id}] {chosen_doc.title} "
                 f"({chosen_doc.inn}), группа: {chosen_doc.category}.\n\n"
-                f"**Показания:** {indications_str}.\n"
-                f"**Режим дозирования:** {chosen_doc.dosage}\n"
-                f"**Противопоказания:** {contraindications_str}."
-                f"{warn_block}\n\n*{DISCLAIMER_TEXT}*"
+                f"Показания: {indications_str}.\n"
+                f"Режим дозирования: {chosen_doc.dosage}\n"
+                f"Противопоказания: {contraindications_str}."
+                f"{warn_block}\n\n{DISCLAIMER_TEXT}"
             )
 
         if not verify_output_grounding(full_text, search_results):
-            full_text += "\n\n*(Сверьте дозировку с официальной инструкцией перед приемом.)*"
+            full_text += "\n\n(Сверьте дозировку с официальной инструкцией перед приемом.)"
 
         return {
             "status": "success",
@@ -494,6 +565,49 @@ class DialogService:
             "disclaimer": DISCLAIMER_TEXT,
         }
 
+    def _build_patient_context_prompt(
+        self,
+        safety_snapshot: dict[str, Any],
+        selected_pills: list[str],
+    ) -> str:
+        profile = safety_snapshot.get("health_profile") or {}
+        age = profile.get("age", 25)
+        weight = profile.get("weight_kg", profile.get("weight", 70))
+        allergies = profile.get("allergies") or []
+        chronic = profile.get("chronic_diseases") or profile.get("chronic") or []
+        notes = profile.get("special_notes") or ""
+
+        kit_items = safety_snapshot.get("kit_items") or []
+        if kit_items:
+            kit_lines = []
+            for it in kit_items:
+                name = it.get("name", "Препарат")
+                dosage = it.get("dosage") or ""
+                expiry = it.get("expiry") or "не указан"
+                expired_flag = "ПРОСРОЧЕН! ПРИЕМ ЗАПРЕЩЕН" if it.get("is_expired") else f"годен до {expiry}"
+                kit_lines.append(f"- {name} ({dosage}) [{expired_flag}]")
+            kit_block = "\n".join(kit_lines)
+        else:
+            kit_block = "Аптечка пользователя пуста."
+
+        lines = [
+            "АКТУАЛЬНЫЙ ПРОФИЛЬ И АПТЕЧКА ПАЦИЕНТА (ОБЯЗАТЕЛЬНО ИСПОЛЬЗОВАТЬ В ОТВЕТЕ):",
+            f"- Возраст: {age} лет",
+            f"- Вес: {weight} кг",
+            f"- Аллергии: {', '.join(allergies) if allergies else 'не указаны'}",
+            f"- Хронические заболевания: {', '.join(chronic) if chronic else 'не указаны'}",
+        ]
+        if notes:
+            lines.append(f"- Особые примечания: {notes}")
+        if selected_pills:
+            lines.append(f"- Явно выбраны пользователем в сообщении: {', '.join(selected_pills)}")
+        lines.append("Домашняя аптечка пользователя:\n" + kit_block)
+        lines.append(
+            "Напоминание: сначала проверь, что есть подходящего (и НЕ просроченного) в аптечке выше, "
+            "обязательно учти возраст/вес/хронику/аллергии, и пиши ЧИСТЫМ ТЕКСТОМ без Markdown (** и ### запрещены)."
+        )
+        return "\n".join(lines)
+
     async def _run_llm_agent_stream(
         self,
         dialog_id: UUID | None,
@@ -514,10 +628,11 @@ class DialogService:
                 CheckInteractionsTool(self._hybrid_index, safety_snapshot),
             ]
         )
+        patient_context = self._build_patient_context_prompt(safety_snapshot, selected_pills)
         agent = Agent(
             llm_provider=self._llm_provider,
             tool_registry=tools,
-            config=AgentConfig(system_prompt=self._system_prompt),
+            config=AgentConfig(system_prompt=f"{self._system_prompt}\n\n{patient_context}"),
         )
 
         prompt_query = query
@@ -544,7 +659,7 @@ class DialogService:
                         DialogEvent(type=DialogEventType.MESSAGE_DELTA, delta=ev.content),
                     )
             elif isinstance(ev, AgentResponse):
-                final_content = ev.content
+                final_content = strip_markdown(ev.content)
                 used_llm = ev.used_llm
         return final_content, used_llm
 
@@ -592,8 +707,8 @@ class DialogService:
                             role=MessageRole.USER if m.role == "user" else MessageRole.ASSISTANT,
                             content=m.content,
                         )
-                        for m in transcript.messages[-6:]
-                        if m.role in ("user", "assistant")
+                        for m in transcript.messages[-20:]
+                        if m.role in ("user", "assistant") and (m.content or "").strip()
                     ]
                     llm_text, used_llm = await self._run_llm_agent_stream(
                         dialog_id=dialog_id,
@@ -705,14 +820,17 @@ class DialogService:
         *,
         owner_id: UUID | None = None,
         user_kit_names: list[str] | None = None,
+        user_kit_items: list[dict[str, Any]] | None = None,
         selected_pills: list[str] | None = None,
         health_profile: dict[str, Any] | None = None,
         response_depth: str = "detailed",
+        history: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Async /chat/query handler enriching with DB profile/kit + optional live LLM."""
         safety_snapshot = await self._load_user_safety_snapshot(
             owner_id,
             kit_names_override=user_kit_names,
+            kit_items_override=user_kit_items,
             health_override=health_profile,
         )
         res = self._synthesize_rag(
@@ -726,16 +844,24 @@ class DialogService:
         used_llm = False
         if res["status"] == "success" and self._can_use_llm() and self._hybrid_index:
             try:
+                client_history = [
+                    Message(
+                        role=MessageRole.USER if h.get("role") == "user" else MessageRole.ASSISTANT,
+                        content=str(h.get("content") or ""),
+                    )
+                    for h in (history or [])[-20:]
+                    if h.get("role") in ("user", "assistant") and str(h.get("content") or "").strip()
+                ]
                 llm_text, used_llm = await self._run_llm_agent_stream(
                     dialog_id=None,
-                    history=[],
+                    history=client_history,
                     query=query,
                     safety_snapshot=safety_snapshot,
                     selected_pills=list(selected_pills or []),
                     response_depth=response_depth,
                 )
                 if llm_text.strip():
-                    res["message"] = llm_text.strip()
+                    res["message"] = strip_markdown(llm_text.strip())
             except Exception:
                 logger.warning("LLM failed in /chat/query; using safety RAG synthesis.")
         res["used_llm"] = used_llm

@@ -7,6 +7,16 @@ export const authApi = {
         return res;
     },
 
+    async updateMe({ name, avatar_color } = {}) {
+        const payload = {};
+        if (name !== undefined) payload.name = String(name).trim();
+        if (avatar_color !== undefined) payload.avatar_color = String(avatar_color).trim();
+        return request('/auth/me', {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+        });
+    },
+
     async login(email, password) {
         return request('/auth/login', {
             method: 'POST',

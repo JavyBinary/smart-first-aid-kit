@@ -19,6 +19,7 @@ from medai.auth.models import (
     RoleUpdateRequest,
     TooManyAttemptsError,
     UnauthorizedError,
+    UpdateMeRequest,
     User,
     UserResponse,
 )
@@ -254,6 +255,25 @@ def create_auth_router(auth_service: AuthService, config: AuthConfig) -> APIRout
             name=user.name,
             role=user.role,
             avatar_color=user.avatar_color,
+        )
+
+    @router.patch("/me", response_model=UserResponse)
+    async def update_me(
+        payload: UpdateMeRequest,
+        user: User = Depends(get_current_user),
+    ) -> UserResponse:
+        updated = await auth_service.update_profile(
+            user_id=user.id,
+            name=payload.name,
+            avatar_color=payload.avatar_color,
+        )
+        effective = updated or user
+        return UserResponse(
+            id=effective.id,
+            email=effective.email,
+            name=effective.name,
+            role=effective.role,
+            avatar_color=effective.avatar_color,
         )
 
     @router.get("/admin/users", response_model=list[UserResponse])

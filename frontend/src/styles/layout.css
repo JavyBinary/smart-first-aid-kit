@@ -751,9 +751,19 @@ html, body {
 .left-rail.collapsed .session-icon {
   display: none !important;
 }
+.left-rail.collapsed .rail-footer-profile {
+  justify-content: center;
+  padding: 14px 0 0;
+  gap: 0;
+}
+.left-rail.collapsed .rail-profile-actions {
+  display: none !important;
+}
 .left-rail.collapsed .user-badge {
+  flex: 0 0 auto;
   padding: 0;
   width: 44px;
+  height: 44px;
   margin: 0 auto;
   justify-content: center;
 }

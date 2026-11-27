@@ -74,8 +74,8 @@
       <!-- Список сохраненных консультаций -->
       <div class="chat-sessions-list" id="chatSessionsList"></div>
 
-      <!-- Кнопка перехода в консоль администратора -->
-      <a href="./admin.html" class="admin-quick-switch-btn tap-effect" id="adminQuickSwitchBtn" title="Панель администратора">
+      <!-- Кнопка перехода в консоль администратора (скрыта до подтверждения роли admin/superadmin) -->
+      <a href="./admin.html" class="admin-quick-switch-btn tap-effect" id="adminQuickSwitchBtn" title="Панель администратора" style="display: none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
         </svg>
@@ -85,10 +85,10 @@
       <!-- Профиль пользователя внизу -->
       <div class="rail-footer-profile">
         <div class="user-badge" id="userProfileBadge" title="Управление аккаунтом">
-          <div class="user-avatar-circle" id="userAvatarMount">П</div>
+          <div class="user-avatar-circle" id="userAvatarMount">Г</div>
           <div class="user-badge-info">
-            <div class="user-meta-name">Пользователь</div>
-            <div class="user-meta-status">Личный профиль</div>
+            <div class="user-meta-name">Гость</div>
+            <div class="user-meta-status">Загрузка...</div>
           </div>
         </div>
         <div class="rail-profile-actions">

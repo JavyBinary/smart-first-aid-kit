@@ -257,10 +257,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Сразу подписываемся и применяем известное состояние профиля, чтобы не было мигания «Пользователь» и админки
+  store.subscribe('user:updated', (user) => applyUserProfile(user));
+  applyUserProfile(store.getState().user);
+
   // 9. Проверка реальной cookie-сессии и гидратация данных из PostgreSQL
   const me = await authApi.getMe();
   if (me && me.id) {
     store.setUser({ id: me.id, name: me.name, email: me.email, role: me.role });
+    applyUserProfile(store.getState().user);
     const [kitItems, profileData, serverDialogs, reportNews] = await Promise.all([
       kitApi.getItems(),
       profileApi.getProfile(),
@@ -296,6 +301,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     store.setKitItems([]);
     applyUserProfile(store.getState().user);
   }
-
-  store.subscribe('user:updated', (user) => applyUserProfile(user));
 });

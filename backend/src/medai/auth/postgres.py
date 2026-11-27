@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, insert, select, update
@@ -152,6 +152,38 @@ class PostgresUserStore(UserStore):
                 avatar_color=row["avatar_color"],
             )
 
+    async def update_profile(
+        self,
+        user_id: UUID,
+        *,
+        name: str | None = None,
+        avatar_color: str | None = None,
+        now: datetime | None = None,
+    ) -> User | None:
+        values: dict[str, object] = {"updated_at": now or datetime.now(UTC)}
+        if name is not None and name.strip():
+            values["name"] = name.strip()
+        if avatar_color is not None and avatar_color.strip():
+            values["avatar_color"] = avatar_color.strip()
+        stmt = (
+            update(users)
+            .where(users.c.id == user_id)
+            .values(**values)
+            .returning(users)
+        )
+        async with self._engine.begin() as conn:
+            result = await conn.execute(stmt)
+            row = result.mappings().first()
+            if not row:
+                return None
+            return User(
+                id=row["id"],
+                email=row["email"],
+                name=row["name"],
+                role=Role(row["role"]),
+                avatar_color=row["avatar_color"],
+            )
+
 
 class PostgresSessionStore(SessionStore):
     def __init__(self, engine: AsyncEngine) -> None:
@@ -200,13 +232,7 @@ class PostgresSessionStore(SessionStore):
         now: datetime,
     ) -> None:
         async with self._engine.begin() as conn:
-            # 1. Update old session
-            await conn.execute(
-                update(refresh_sessions)
-                .where(refresh_sessions.c.id == old_session_id)
-                .values(replaced_by=new_session.id, revoked_at=now)
-            )
-            # 2. Insert new session
+            # 1. Insert new session first so FK old.replaced_by -> new.id is satisfied
             await conn.execute(
                 insert(refresh_sessions).values(
                     id=new_session.id,
@@ -218,6 +244,12 @@ class PostgresSessionStore(SessionStore):
                     revoked_at=new_session.revoked_at,
                     replaced_by=new_session.replaced_by,
                 )
+            )
+            # 2. Update old session pointing to newly inserted replacement
+            await conn.execute(
+                update(refresh_sessions)
+                .where(refresh_sessions.c.id == old_session_id)
+                .values(replaced_by=new_session.id, revoked_at=now)
             )
 
     async def revoke_session(self, session_id: UUID, now: datetime) -> None:

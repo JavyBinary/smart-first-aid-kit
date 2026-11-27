@@ -4,7 +4,7 @@
  * Для гостевого режима отображает информационную карточку без редактирования.
  */
 
-import { store } from '../state/store.js';
+import { store, VOICE_OPTIONS } from '../state/store.js';
 import { authApi } from '../api/auth.api.js';
 
 export class AccountProfileModal {
@@ -129,10 +129,9 @@ export class AccountProfileModal {
           <div>
             <label class="modal-label">Голос озвучивания (TTS)</label>
             <select id="accVoiceSelect" class="modal-input">
-              <option value="baya" ${store.getState().voice === 'baya' ? 'selected' : ''}>Baya (женский, мягкий)</option>
-              <option value="kseniya" ${store.getState().voice === 'kseniya' ? 'selected' : ''}>Kseniya (женский, чёткий)</option>
-              <option value="aidar" ${store.getState().voice === 'aidar' ? 'selected' : ''}>Aidar (мужской)</option>
-              <option value="eugene" ${store.getState().voice === 'eugene' ? 'selected' : ''}>Eugene (мужской)</option>
+              ${VOICE_OPTIONS.map(v => `
+                <option value="${v.id}" ${store.getState().voice === v.id ? 'selected' : ''}>${v.label}</option>
+              `).join('')}
             </select>
           </div>
 
@@ -265,11 +264,28 @@ export class AccountProfileModal {
       }
 
       if (newName) {
-        store.setUser({
-          name: newName,
-          email: newEmail,
-          avatar: this.selectedAvatar
-        });
+        if (store.isAuthenticated()) {
+          const updated = await authApi.updateMe({ name: newName });
+          if (updated && updated.id) {
+            store.setUser({
+              name: updated.name,
+              email: updated.email,
+              avatar: this.selectedAvatar,
+            });
+          } else {
+            store.setUser({
+              name: newName,
+              email: newEmail,
+              avatar: this.selectedAvatar,
+            });
+          }
+        } else {
+          store.setUser({
+            name: newName,
+            email: newEmail,
+            avatar: this.selectedAvatar
+          });
+        }
 
         if (alertBox) {
           alertBox.style.display = 'block';

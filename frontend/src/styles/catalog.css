@@ -204,17 +204,99 @@
   margin-top: 2px;
   margin-bottom: 4px;
 }
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
+
+.med-card-expiry-pill {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #065F46;
+}
+.med-card-expiry-pill.expired {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border-color: #FECACA;
 }
 
 .med-card-title {
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.med-card-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.catalog-variant-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #F8FAFC;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.catalog-variant-select:focus {
+  border-color: var(--brand);
+  background: #FFFFFF;
+}
+
+.catalog-date-qty-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.catalog-field-mini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.catalog-qty-mini {
+  flex: 0 0 auto;
+}
+
+.catalog-expiry-input,
+.catalog-qty-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--text-main);
+  background: #FFFFFF;
+  outline: none;
+}
+
+.catalog-expiry-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.catalog-qty-input {
+  width: 44px;
+  text-align: center;
 }
 
 .med-card-dosage {

@@ -2,18 +2,10 @@
  * Chat: Интеллектуальный медицинский диалог (SSE, RAG, Guardrails, Feedback, Reports, TTS)
  */
 
-import { store } from '../state/store.js';
+import { store, VOICE_OPTIONS } from '../state/store.js';
 import { chatApi } from '../api/chat.api.js';
 import { dialogsApi } from '../api/dialogs.api.js';
 import { Mascot } from './Mascot.js';
-
-const QUICK_PROMPT_CHIPS = [
-  { label: 'Болит голова', query: 'Болит голова и лёгкая усталость, что из моей аптечки подойдёт?' },
-  { label: 'Высокая температура', query: 'Температура 38.6, озноб — чем сбить с учётом моей медкарты?' },
-  { label: 'Болит живот / изжога', query: 'Тяжесть и боли в желудке после еды, что можно принять?' },
-  { label: 'Аллергия / зуд', query: 'Сезонная аллергия, чихание и зуд — какой препарат подойдёт?' },
-  { label: 'Ожог кипятком (112)', query: 'Ребёнок обжёг руку кипятком, волдырь, что делать прямо сейчас?' },
-];
 
 const FEEDBACK_FACES = [
   { score: 1, icon: '😞', title: 'Совсем плохо (1/5)' },
@@ -22,6 +14,17 @@ const FEEDBACK_FACES = [
   { score: 4, icon: '🙂', title: 'Хорошо (4/5)' },
   { score: 5, icon: '😄', title: 'Отлично (5/5)' },
 ];
+
+function stripMarkdownForDisplay(text) {
+  return String(text || '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/(^|[^\wа-яА-ЯёЁ])\*([^*\n]+?)\*(?=[^\wа-яА-ЯёЁ]|$)/g, '$1$2')
+    .replace(/`([^`]+?)`/g, '$1')
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '');
+}
 
 function escapeHtml(text) {
   return String(text || '')
@@ -303,13 +306,33 @@ export class Chat {
 
   async handleStatelessFallbackQuery(queryText, selectedPills) {
     const state = store.getState();
+    const activeSess = state.sessions.find((s) => s.id === state.activeSessionId);
+    const prevMsgs = activeSess ? activeSess.messages.slice(0, -1) : [];
+    const sessionHistory = prevMsgs
+      .filter((m) => m && (m.sender === 'user' || m.sender === 'bot'))
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: String((m.data && m.data.message) || m.text || '').trim(),
+      }))
+      .filter((m) => m.content)
+      .slice(-16);
+
     try {
       const response = await chatApi.sendQuery(queryText, {
         include_kit_context: true,
         user_kit_names: (state.kitItems || []).map((i) => i.name),
+        user_kit_items: (state.kitItems || []).map((i) => ({
+          name: i.name,
+          dosage: i.dosage,
+          form: i.form,
+          expiry: i.expiry,
+          is_expired: Boolean(i.is_expired),
+          status: i.status,
+        })),
         selected_pills: selectedPills.map((p) => p.name),
         health_profile: state.healthProfile,
         response_depth: state.responseDepth,
+        history: sessionHistory,
       });
 
       if (response && response.emergency_mode) {
@@ -357,12 +380,15 @@ export class Chat {
     }
 
     bar.style.display = 'flex';
-    bar.innerHTML = pills.map(p => `
+    bar.innerHTML = pills.map(p => {
+      const expStr = p.expiry ? ` · до ${p.expiry}` : '';
+      return `
       <div class="selected-med-pill">
-        <span>${escapeHtml(p.name)} (${escapeHtml(p.dosage)})</span>
+        <span>${escapeHtml(p.name)} (${escapeHtml(p.dosage || 'по инструкции')}${escapeHtml(expStr)})</span>
         <button class="selected-med-pill-remove" data-id="${p.id}">&times;</button>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     bar.querySelectorAll('.selected-med-pill-remove').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -470,16 +496,6 @@ export class Chat {
         <div class="chat-empty-state">
           <div class="empty-mascot-wrapper" id="emptyMascotMount"></div>
           <h2 class="empty-state-greeting">Чем могу помочь сегодня, ${escapeHtml(userName)}?</h2>
-          <p style="font-size: 13.5px; color: var(--text-muted); max-width: 520px; text-align: center; margin-top: 4px;">
-            Учитываю состав вашей домашней аптечки, возраст, аллергии и хронические заболевания.
-          </p>
-          <div class="chat-chips-row">
-            ${QUICK_PROMPT_CHIPS.map((c, idx) => `
-              <button type="button" class="chat-prompt-chip tap-effect" data-chip-idx="${idx}">
-                ${escapeHtml(c.label)}
-              </button>
-            `).join('')}
-          </div>
         </div>
       `;
 
@@ -487,12 +503,6 @@ export class Chat {
       if (mount) {
         this.emptyMascot = new Mascot(mount);
       }
-      list.querySelectorAll('.chat-prompt-chip').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const chip = QUICK_PROMPT_CHIPS[Number(btn.dataset.chipIdx)];
-          if (chip) this.sendPromptText(chip.query);
-        });
-      });
       return;
     }
 
@@ -514,7 +524,7 @@ export class Chat {
       }
 
       const data = msg.data || {};
-      const fullPlainText = data.message || msg.text || '';
+      const fullPlainText = stripMarkdownForDisplay(data.message || msg.text || '');
 
       if (msg.isEmergency) {
         const isBurn = /ожог|кипят|плам/i.test(fullPlainText) || (data.first_aid_steps || []).some((s) => /охлад|водой/i.test(s));
@@ -656,7 +666,7 @@ export class Chat {
         const d = msg.data || {};
         const rec = d.recommendation;
         const copyText = [
-          d.message || msg.text,
+          stripMarkdownForDisplay(d.message || msg.text),
           rec ? `${rec.medicine_name}: ${rec.dosage}` : '',
         ].filter(Boolean).join('\n\n');
         try {
@@ -808,11 +818,9 @@ export class Chat {
             <div style="display: flex; align-items: center; gap: 6px;">
               <span style="font-size: 11.5px; color: var(--text-muted);">Голос:</span>
               <select id="chatVoiceSelect" style="font-size: 11.5px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--brand-dark); font-weight: 600;">
-                <option value="baya" ${voice === 'baya' ? 'selected' : ''}>Baya</option>
-                <option value="kseniya" ${voice === 'kseniya' ? 'selected' : ''}>Kseniya</option>
-                <option value="xenia" ${voice === 'xenia' ? 'selected' : ''}>Xenia</option>
-                <option value="aidar" ${voice === 'aidar' ? 'selected' : ''}>Aidar</option>
-                <option value="eugene" ${voice === 'eugene' ? 'selected' : ''}>Eugene</option>
+                ${VOICE_OPTIONS.map(v => `
+                  <option value="${v.id}" ${voice === v.id ? 'selected' : ''}>${v.short}</option>
+                `).join('')}
               </select>
             </div>
           </div>

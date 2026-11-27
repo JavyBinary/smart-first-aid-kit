@@ -19,7 +19,8 @@ __all__ = [
     "analyze_medicine_safety",
 ]
 
-NSAID_CLASSES = frozenset({"ибупрофен", "напроксен", "нимесулид", "аспирин", "ацетилсалициловая"})
+NSAID_CLASSES = frozenset({"ибупрофен", "напроксен", "нимесулид", "нимесил", "аспирин", "ацетилсалициловая", "кеторолак", "кетанов", "диклофенак"})
+VASOCONSTRICTORS = frozenset({"фенилэфрин", "ксилометазолин", "снуп", "терафлю", "колдрекс", "називин", "отривин"})
 
 
 def analyze_medicine_safety(
@@ -27,29 +28,41 @@ def analyze_medicine_safety(
     health_profile: dict[str, Any] | None = None,
     user_kit_items: list[dict[str, Any]] | None = None,
 ) -> list[str]:
-    """Cross-check candidate medicines against allergies, chronic conditions, duplicates, and expiry."""
+    """Cross-check candidate medicines against allergies, chronic conditions, age, weight, duplicates, and expiry."""
     warnings: list[str] = []
     profile = health_profile or {}
     allergies = [normalize_text(str(a)) for a in profile.get("allergies", []) if str(a).strip()]
     chronic = [normalize_text(str(c)) for c in profile.get("chronic_diseases", profile.get("chronic", [])) if str(c).strip()]
     age = int(profile.get("age", 25) or 25)
+    raw_weight = profile.get("weight_kg", profile.get("weight", 70))
+    try:
+        weight_kg = float(raw_weight) if raw_weight is not None else 70.0
+    except (TypeError, ValueError):
+        weight_kg = 70.0
 
-    # 1. Check allergy and chronic disease conflicts per document
+    # 1. Check allergy, chronic disease, age and weight conflicts per document
     seen_inns: dict[str, list[str]] = {}
     for doc in docs:
         doc_blob = normalize_text(
-            f"{doc.title} {doc.inn} {doc.category} {' '.join(doc.contraindications)}"
+            f"{doc.title} {doc.inn} {doc.category} {' '.join(doc.contraindications)} {doc.dosage}"
         )
+        contra_blob = normalize_text(" ".join(doc.contraindications))
         # Split compound INNs (e.g. "Парацетамол + Напроксен + ...")
         inn_parts = [normalize_text(p) for p in doc.inn.split("+") if p.strip()]
         for inn in inn_parts:
             seen_inns.setdefault(inn, []).append(doc.title)
 
+        is_nsaid = any(n in doc_blob for n in NSAID_CLASSES)
+        is_vaso = any(v in doc_blob for v in VASOCONSTRICTORS)
+        has_paracetamol = "парацетамол" in doc_blob
+
         for allergy in allergies:
             if allergy and (
                 allergy in doc_blob
                 or any(allergy in part or part in allergy for part in inn_parts)
-                or ("нпвп" in allergy and any(n in doc_blob for n in NSAID_CLASSES))
+                or ("нпвп" in allergy and is_nsaid)
+                or ("пенициллин" in allergy and "пенициллин" in doc_blob)
+                or ("сульфан" in allergy and "сульфан" in doc_blob)
             ):
                 warnings.append(
                     f"ВНИМАНИЕ (АЛЛЕРГИЯ): Препарат «{doc.title}» может содержать или "
@@ -58,30 +71,81 @@ def analyze_medicine_safety(
 
         # Chronic disease conflicts
         for disease in chronic:
-            if any(k in disease for k in ("гастрит", "язва", "жкт")):
-                if any(n in doc_blob for n in NSAID_CLASSES) or "язва" in doc_blob:
+            if any(k in disease for k in ("гастрит", "язва", "жкт", "гэрб", "рефлюкс")):
+                if is_nsaid or "язва" in contra_blob:
                     warnings.append(
                         f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» содержит компоненты "
                         f"(НПВП/раздражители слизистой), нежелательные при заболевании «{disease}»."
                     )
             if any(k in disease for k in ("печен", "цирроз", "гепатит")) and (
-                "парацетамол" in doc_blob or "печен" in doc_blob
+                has_paracetamol or "печен" in contra_blob
             ):
                 warnings.append(
                     f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» требует осторожности "
-                    f"при патологиях печени."
+                    f"при патологиях печени ({weight_kg:g} кг, {age} лет)."
                 )
-            if any(k in disease for k in ("астма", "бронх")) and (
-                any(n in doc_blob for n in NSAID_CLASSES) or "астм" in doc_blob
+            if any(k in disease for k in ("астма", "бронх", "хобл")) and (
+                is_nsaid or "астм" in contra_blob
             ):
                 warnings.append(
-                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): проверьте переносимость «{doc.title}» при бронхиальной астме."
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): проверьте переносимость «{doc.title}» при заболеваниях дыхательных путей ({disease})."
+                )
+            if any(k in disease for k in ("гипертон", "давлен", "ибс", "аритм", "тахикард", "серд")) and (
+                is_vaso or is_nsaid or any(k in contra_blob for k in ("гипертенз", "ритм", "серд", "тахикард"))
+            ):
+                warnings.append(
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» может повышать давление или нагружать сердце при «{disease}»."
+                )
+            if any(k in disease for k in ("почк", "почеч", "пиелонефр", "мочекамен", "хпн")) and (
+                is_nsaid or "почеч" in contra_blob or "нефрокальц" in contra_blob
+            ):
+                warnings.append(
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» требует корректировки или исключения при «{disease}»."
+                )
+            if "диабет" in disease and ("диабет" in contra_blob or "сахар" in doc_blob or "порошок" in doc_blob):
+                warnings.append(
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): проверьте состав «{doc.title}» на содержание сахара и влияние на гликемию."
+                )
+            if "глауком" in disease and "глауком" in contra_blob:
+                warnings.append(
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» противопоказан при глаукоме."
+                )
+            if any(k in disease for k in ("беремен", "лактац", "гв")) and (
+                "беремен" in contra_blob or "лактац" in contra_blob or is_nsaid
+            ):
+                warnings.append(
+                    f"ВНИМАНИЕ (МЕДКАРТА — {disease}): «{doc.title}» может быть противопоказан при «{disease}»."
                 )
 
-        # Age safety check
-        if age < 12 and ("старше 12" in normalize_text(doc.dosage) or "старше 18" in normalize_text(doc.dosage)):
+        # Age & weight safety checks
+        if age < 12 and ("старше 12" in doc_blob or "старше 18" in doc_blob or "до 12" in contra_blob or "до 18" in contra_blob):
             warnings.append(
-                f"ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ ({age} лет): «{doc.title}» не рекомендован без педиатра."
+                f"ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ ({age} лет, {weight_kg:g} кг): «{doc.title}» не рекомендован без педиатра."
+            )
+        elif age < 15 and ("до 15" in contra_blob or "метамизол" in doc_blob or "ацетилсалицил" in doc_blob):
+            warnings.append(
+                f"ВОЗРАСТНОЕ ОГРАНИЧЕНИЕ ({age} лет): «{doc.title}» не применяется до 15 лет."
+            )
+        elif age >= 65 and (is_nsaid or "хлоропирамин" in doc_blob or "фенобарбитал" in doc_blob):
+            warnings.append(
+                f"ВОЗРАСТ ({age} лет): при возрасте 65+ препарат «{doc.title}» применяйте с осторожностью в минимальной эффективной дозе."
+            )
+
+        if has_paracetamol and (weight_kg < 50 or age < 12):
+            min_d = round(10 * weight_kg)
+            max_d = round(15 * weight_kg)
+            warnings.append(
+                f"УЧЕТ ВЕСА ({weight_kg:g} кг): ориентировочная разовая доза парацетамола 10–15 мг/кг составляет {min_d}–{max_d} мг; не принимайте дозу выше этого предела."
+            )
+        elif "ибупрофен" in inn_parts and (weight_kg < 50 or age < 12):
+            min_d = round(5 * weight_kg)
+            max_d = round(10 * weight_kg)
+            warnings.append(
+                f"УЧЕТ ВЕСА ({weight_kg:g} кг): ориентировочная разовая доза ибупрофена 5–10 мг/кг составляет {min_d}–{max_d} мг."
+            )
+        elif weight_kg < 45 and age >= 12:
+            warnings.append(
+                f"МАЛАЯ МАССА ТЕЛА ({weight_kg:g} кг): выбирайте минимальную разовую дозировку препарата «{doc.title}»."
             )
 
         # Document-level interactions

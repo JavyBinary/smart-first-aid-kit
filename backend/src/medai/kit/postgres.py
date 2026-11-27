@@ -113,8 +113,16 @@ class PostgresKitStore(KitStore):
         target_uuid = _to_uuid(item_id)
         updates: dict = {"updated_at": datetime.now(UTC)}
 
+        if req.name is not None:
+            updates["medicine_name"] = req.name
         if req.dosage is not None:
             updates["dosage"] = req.dosage
+        if req.form is not None:
+            updates["form"] = req.form
+        if req.category is not None:
+            updates["category"] = req.category
+        if req.tags is not None:
+            updates["tags"] = req.tags
         if req.quantity is not None:
             updates["quantity"] = req.quantity
         if req.status is not None:

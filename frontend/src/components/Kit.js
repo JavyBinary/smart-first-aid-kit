@@ -9,8 +9,34 @@ import { ConfirmModal } from './ConfirmModal.js';
 import { medicalCatalogModal } from './MedicalCatalogModal.js';
 import { addMedicineModal } from './AddMedicineModal.js';
 
-export const ALLERGY_PRESETS = ['Пенициллин', 'Аспирин', 'Сульфаниламиды', 'Цитрусовые', 'Пыльца', 'Лидокаин'];
-export const CHRONIC_PRESETS = ['Гастрит', 'Гипертония', 'Астма', 'Сахарный диабет', 'Язва желудка', 'Мигрень'];
+export const ALLERGY_PRESETS = [
+  'Пенициллин',
+  'Аспирин',
+  'НПВП / Ибупрофен',
+  'Парацетамол',
+  'Сульфаниламиды',
+  'Лидокаин',
+  'Йод',
+  'Лактоза',
+  'Цитрусовые',
+  'Пыльца (поллиноз)',
+  'Орехи / арахис',
+  'Укусы насекомых',
+];
+export const CHRONIC_PRESETS = [
+  'Гастрит',
+  'Язва желудка',
+  'ГЭРБ / изжога',
+  'Гипертония',
+  'Астма',
+  'Сахарный диабет',
+  'Мигрень',
+  'Болезни печени',
+  'Болезни почек',
+  'ИБС / сердце',
+  'Глаукома',
+  'Беременность / ГВ',
+];
 export const AGE_PRESETS = ['Взрослый', 'Пожилой (65+)', 'Ребенок (до 12)', 'Подросток'];
 
 export class Kit {
@@ -200,10 +226,7 @@ export class Kit {
 
   getExpiryStatus(item) {
     if (!item) return 'safe';
-    const cat = item.category || '';
-    if (cat.includes('Антибиот') || cat.includes('Спец') || item.isSpecial) {
-      return 'blue';
-    }
+    if (item.is_expired) return 'expired';
     const expiryDateStr = typeof item === 'string' ? item : item.expiry;
     if (!expiryDateStr) return 'safe';
     const now = new Date();
@@ -212,7 +235,20 @@ export class Kit {
 
     if (diffDays < 0) return 'expired';
     if (diffDays <= 60) return 'warning';
+    const cat = item.category || '';
+    if (cat.includes('Антибиот') || cat.includes('Спец') || item.isSpecial) {
+      return 'blue';
+    }
     return 'safe';
+  }
+
+  formatExpiryBadge(expiryStr, status) {
+    if (!expiryStr) return 'Срок не указан';
+    const parts = String(expiryStr).split('-');
+    const pretty = parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : expiryStr;
+    if (status === 'expired') return `Просрочен (${pretty})`;
+    if (status === 'warning') return `Истекает ${pretty}`;
+    return `Годен до ${pretty}`;
   }
 
   formatAge(ageVal) {
@@ -270,23 +306,32 @@ export class Kit {
 
     const selectedPills = store.getState().selectedPills;
 
-    // Восстановленный красивый исходный дизайн карточек аптечки с цветными точками и рецептурным статусом
     list.innerHTML = items.map(item => {
       const isSelected = selectedPills.some(p => p.id === item.id);
       const expiryStatus = this.getExpiryStatus(item);
-      const isRx = item.is_prescription || item.isPrescription || (item.category && item.category.includes('Антибиот'));
+      const isRx = item.status === 'rx' || item.is_prescription || item.isPrescription || (item.category && item.category.includes('Антибиот'));
+      const formattedExpiry = this.formatExpiryBadge(item.expiry, expiryStatus);
 
       return `
-        <div class="kit-item-card tap-effect ${isSelected ? 'selected-for-chat' : ''}" data-id="${item.id}">
+        <div class="kit-item-card tap-effect ${isSelected ? 'selected-for-chat' : ''} ${expiryStatus === 'expired' ? 'is-expired-card' : ''}" data-id="${item.id}">
           <div class="kit-item-meta">
-            <div class="kit-item-name">${item.name}</div>
+            <div class="kit-item-name">${item.name} ${item.quantity > 1 ? `<span class="kit-qty-badge">×${item.quantity}</span>` : ''}</div>
             <div class="kit-item-details">
               ${item.dosage || ''}${item.dosage && item.form ? ' · ' : ''}${item.form || ''}
+            </div>
+            <div class="kit-item-badges-row">
               <span class="kit-rx-tag ${isRx ? 'rx' : 'otc'}">${isRx ? 'По рецепту' : 'Без рецепта'}</span>
+              <span class="kit-expiry-badge ${expiryStatus}">${formattedExpiry}</span>
             </div>
           </div>
           <div class="kit-item-right">
-            <span class="expiry-dot ${expiryStatus}"></span>
+            <span class="expiry-dot ${expiryStatus}" title="${formattedExpiry}"></span>
+            <button class="kit-item-edit tap-effect" data-id="${item.id}" title="Редактировать препарат">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
             <button class="kit-item-delete tap-effect" data-id="${item.id}" data-name="${item.name}" title="Удалить из аптечки">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -301,10 +346,20 @@ export class Kit {
     // Клик по карточке — выбор в чат
     list.querySelectorAll('.kit-item-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.kit-item-delete')) return;
+        if (e.target.closest('.kit-item-delete') || e.target.closest('.kit-item-edit')) return;
         const id = card.dataset.id;
         const item = store.getState().kitItems.find(i => i.id === id);
         if (item) store.togglePillSelection(item);
+      });
+    });
+
+    // Клик по редактированию
+    list.querySelectorAll('.kit-item-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const item = store.getState().kitItems.find(i => String(i.id) === String(id));
+        if (item) addMedicineModal.openEdit(item);
       });
     });
 

@@ -116,15 +116,24 @@ class ReportNewsSeenRequest(BaseModel):
     report_ids: list[int] = Field(min_length=1)
 
 
+class ChatQueryHistoryItem(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatQueryRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", frozen=True)
 
     query: str = Field(min_length=1)
     include_kit_context: bool = True
     user_kit_names: list[str] = Field(default_factory=list)
+    user_kit_items: list[dict[str, Any]] = Field(default_factory=list)
     selected_pills: list[str] = Field(default_factory=list)
     health_profile: dict[str, Any] | None = None
     response_depth: Literal["brief", "detailed"] = "detailed"
+    history: list[ChatQueryHistoryItem] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):
@@ -407,9 +416,11 @@ def create_dialogs_router(dialog_service: DialogService) -> APIRouter:
             query=body.query,
             owner_id=user.id if user else None,
             user_kit_names=body.user_kit_names,
+            user_kit_items=body.user_kit_items,
             selected_pills=body.selected_pills,
             health_profile=body.health_profile,
             response_depth=body.response_depth,
+            history=[{"role": h.role, "content": h.content} for h in body.history],
         )
         return ChatQueryResponse.model_validate(res)
 

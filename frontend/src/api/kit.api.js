@@ -26,7 +26,15 @@ export function serializeCreateKitItem(item) {
 
 export function serializeUpdateKitItem(updates) {
     const payload = {};
+    if (updates.name !== undefined) payload.name = String(updates.name).trim();
     if (updates.dosage !== undefined) payload.dosage = String(updates.dosage).trim();
+    if (updates.form !== undefined) payload.form = String(updates.form).trim();
+    if (updates.category !== undefined) payload.category = String(updates.category).trim();
+    if (updates.tags !== undefined) {
+        payload.tags = Array.isArray(updates.tags)
+            ? updates.tags.map((t) => String(t).trim()).filter(Boolean)
+            : [];
+    }
     if (updates.quantity !== undefined) payload.quantity = Math.max(1, Number.parseInt(updates.quantity, 10) || 1);
     if (updates.expiry !== undefined) payload.expiry = String(updates.expiry).trim();
     if (updates.status !== undefined) {

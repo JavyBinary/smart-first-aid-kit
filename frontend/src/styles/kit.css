@@ -153,6 +153,29 @@
   gap: 8px;
 }
 
+.kit-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 18px;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.kit-empty-state svg {
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.kit-empty-state p {
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 220px;
+}
+
 .kit-items-list::-webkit-scrollbar {
   width: 5px;
 }
@@ -232,6 +255,50 @@
   background: #4EA8DE;
 }
 
+.kit-item-card.is-expired-card {
+  border-color: rgba(255, 59, 48, 0.35);
+  background: #FFF9F9;
+}
+
+.kit-qty-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  background: var(--brand-light);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-left: 4px;
+}
+
+.kit-item-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.kit-expiry-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.kit-expiry-badge.safe,
+.kit-expiry-badge.blue {
+  background: #F1F5F9;
+  color: #475569;
+}
+.kit-expiry-badge.warning {
+  background: #FEF3C7;
+  color: #B45309;
+}
+.kit-expiry-badge.expired {
+  background: #FEE2E2;
+  color: #B91C1C;
+  font-weight: 700;
+}
+
 /* Микро-бейдж рецептурности Rx / OTC */
 .kit-rx-tag {
   font-size: 10px;
@@ -241,7 +308,6 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   display: inline-block;
-  margin-top: 3px;
 }
 .kit-rx-tag.otc {
   background: #E1F8EC;
@@ -252,6 +318,7 @@
   color: #D97008;
 }
 
+.kit-item-edit,
 .kit-item-delete {
   background: none;
   border: none;
@@ -259,11 +326,16 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
-  opacity: 0.4;
+  opacity: 0.45;
   transition: all 0.15s;
 }
+.kit-item-card:hover .kit-item-edit,
 .kit-item-card:hover .kit-item-delete {
   opacity: 1;
+}
+.kit-item-edit:hover {
+  color: var(--brand);
+  background: rgba(0, 176, 116, 0.1);
 }
 .kit-item-delete:hover {
   color: var(--danger);

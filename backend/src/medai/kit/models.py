@@ -81,7 +81,11 @@ class CreateKitItemRequest(BaseModel):
 class UpdateKitItemRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    name: str | None = Field(default=None, min_length=1)
     dosage: str | None = None
+    form: str | None = None
+    category: str | None = None
+    tags: list[str] | None = None
     quantity: int | None = Field(default=None, ge=1)
     expiry: str | None = None
     status: Literal["otc", "rx"] | None = None

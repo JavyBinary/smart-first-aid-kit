@@ -3,6 +3,14 @@
  */
 import { authApi } from '../api/auth.api.js';
 
+export const VOICE_OPTIONS = [
+  { id: 'baya', label: 'Baya (женский, мягкий)', short: 'Baya' },
+  { id: 'kseniya', label: 'Kseniya (женский, чёткий)', short: 'Kseniya' },
+  { id: 'xenia', label: 'Xenia (женский, тёплый)', short: 'Xenia' },
+  { id: 'aidar', label: 'Aidar (мужской, спокойный)', short: 'Aidar' },
+  { id: 'eugene', label: 'Eugene (мужской, низкий)', short: 'Eugene' },
+];
+
 class AppStore {
   constructor() {
     this.subscribers = new Map();
@@ -93,6 +101,20 @@ class AppStore {
 
   addKitItem(item) {
     this.state.kitItems.unshift(item);
+    this.notify('kit:updated', this.state.kitItems);
+  }
+
+  updateKitItem(updatedItem) {
+    if (!updatedItem || !updatedItem.id) return;
+    const idx = this.state.kitItems.findIndex(i => String(i.id) === String(updatedItem.id));
+    if (idx !== -1) {
+      this.state.kitItems[idx] = { ...this.state.kitItems[idx], ...updatedItem };
+    }
+    const selIdx = this.state.selectedPills.findIndex(p => String(p.id) === String(updatedItem.id));
+    if (selIdx !== -1) {
+      this.state.selectedPills[selIdx] = { ...this.state.selectedPills[selIdx], ...updatedItem };
+      this.notify('selectedPills:updated', this.state.selectedPills);
+    }
     this.notify('kit:updated', this.state.kitItems);
   }
 

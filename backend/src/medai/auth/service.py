@@ -230,6 +230,21 @@ class AuthService:
             return await self._users.update_role(target_user_id, new_role, current_time)
         return None
 
+    async def update_profile(
+        self,
+        *,
+        user_id: UUID,
+        name: str | None = None,
+        avatar_color: str | None = None,
+        now: datetime | None = None,
+    ) -> User | None:
+        if hasattr(self._users, "update_profile"):
+            current_time = datetime.now(UTC) if now is None else now
+            return await self._users.update_profile(
+                user_id, name=name, avatar_color=avatar_color, now=current_time
+            )
+        return await self._users.get_by_id(user_id)
+
     async def list_users(self) -> list[User]:
         if hasattr(self._users, "list_all"):
             return await self._users.list_all()

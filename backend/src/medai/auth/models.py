@@ -73,6 +73,13 @@ class RoleUpdateRequest(BaseModel):
     role: Role
 
 
+class UpdateMeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    avatar_color: str | None = Field(default=None, min_length=1, max_length=32)
+
+
 class Credentials(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
