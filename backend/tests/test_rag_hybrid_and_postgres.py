@@ -96,6 +96,9 @@ def test_ablation_benchmark_and_extended_eval() -> None:
     assert ext_path.exists()
 
     rep_hybrid = run_benchmark(queries_path=ext_path, mode="hybrid")
+    assert rep_hybrid.question_count == 30
+    assert rep_hybrid.normal_count == 20
+    assert rep_hybrid.trap_count == 10
     assert rep_hybrid.mrr >= 0.85
     assert rep_hybrid.correct_rejection_rate == 1.0
     assert rep_hybrid.accuracy >= 0.85
@@ -103,6 +106,8 @@ def test_ablation_benchmark_and_extended_eval() -> None:
 
     ablation = run_ablation_benchmark(queries_path=ext_path)
     assert [row.mode for row in ablation] == ["BM25", "DENSE", "HYBRID"]
+    assert ablation[2].mrr >= ablation[0].mrr
+    assert ablation[2].correct_rejection_rate >= ablation[0].correct_rejection_rate
 
 
 def test_postgres_rag_store_sql_and_helpers() -> None:

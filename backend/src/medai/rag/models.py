@@ -26,6 +26,18 @@ class MedicineDocument(BaseModel):
     interactions: list[str] = Field(default_factory=list)
     emergency_flags: list[str] = Field(default_factory=list)
 
+    def primary_text(self) -> str:
+        """Primary clinical identity & indications text (excludes contraindications/interactions)."""
+        parts = [
+            self.title,
+            self.inn,
+            self.category,
+            " ".join(self.forms),
+            " ".join(self.indications),
+            " ".join(self.emergency_flags),
+        ]
+        return " ".join(parts)
+
     def full_text(self) -> str:
         """Compose searchable text from title, inn, category, indications, and interactions."""
         parts = [

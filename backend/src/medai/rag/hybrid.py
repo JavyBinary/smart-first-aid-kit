@@ -24,50 +24,98 @@ __all__ = [
 MEDICAL_SYNONYMS: dict[str, tuple[str, ...]] = {
     "температура": ("жар", "лихорадка", "озноб", "орви", "грипп"),
     "жар": ("температура", "лихорадка", "жаропонижающее"),
-    "лихорадка": ("температура", "жар"),
-    "голова": ("головная боль", "мигрень", "виски", "обезболивающее"),
+    "лихорадка": ("температура", "жар", "озноб"),
+    "озноб": ("температура", "лихорадка", "простуда"),
+    "знобит": ("озноб", "температура", "лихорадка"),
+    "голова": ("головная боль", "мигрень", "обезболивающее"),
+    "виски": ("головная боль", "мигрень", "анальгетик"),
+    "ломит": ("головная боль", "миалгия", "ломота"),
     "мигрень": ("головная боль", "обезболивающее"),
-    "зуб": ("зубная боль", "челюсть", "обезболивающее"),
-    "живот": ("спазм", "колики", "брюшной", "спазмолитик", "жкт"),
-    "желудок": ("жкт", "изжога", "тяжесть", "панкреатин", "омепразол"),
-    "жкт": ("желудок", "кишечник", "изжога", "тяжесть", "диарея"),
-    "понос": ("диарея", "жидкий стул", "расстройство", "смекта", "полисорб"),
-    "диарея": ("жидкий стул", "расстройство", "энтеросорбент"),
-    "отравление": ("токсины", "диарея", "сорбент", "полисорб", "активированный уголь"),
-    "рвота": ("тошнота", "отравление", "обезвоживание"),
-    "тошнота": ("отравление", "рвота", "желудок"),
-    "изжога": ("кислотность", "отрыжка", "антацид", "ренни", "омепразол"),
-    "горло": ("першение", "глотать", "тонзиллит", "стрепсилс"),
-    "насморк": ("нос", "заложенность", "ринит", "снуп"),
-    "аллергия": ("зуд", "сыпь", "чихание", "антигистаминный", "поллиноз"),
-    "крапивница": ("аллергия", "зуд", "сыпь"),
-    "порез": ("рана", "ссадина", "кровотечение", "антисептик", "хлоргексидин"),
-    "рана": ("порез", "ссадина", "дезинфекция", "хлоргексидин", "перекись"),
-    "кашель": ("мокрота", "бронхит", "ацц"),
-    "сердце": ("стенокардия", "давящая боль", "нитроглицерин"),
-    "нпвп": ("ибупрофен", "обезболивающее", "противовоспалительное"),
-    "орви": ("простуда", "грипп", "температура", "насморк"),
+    "зуб": ("зубная боль", "анальгетик", "нпвп"),
+    "челюсть": ("зубная боль", "невралгия", "болевой синдром"),
+    "живот": ("спазм", "колика", "брюшной", "спазмолитик", "жкт", "кишечник"),
+    "скрутило": ("спазм", "колика", "спазмолитик"),
+    "колики": ("колика", "спазм", "спазмолитик"),
+    "желудок": ("жкт", "изжога", "гастрит", "диспепсия", "антацид"),
+    "жкт": ("желудок", "кишечник", "изжога", "диспепсия", "диарея"),
+    "понос": ("диарея", "жидкий стул", "расстройство кишечника", "энтеросорбент"),
+    "диарея": ("жидкий стул", "расстройство кишечника", "энтеросорбент"),
+    "отравление": ("токсины", "токсикоинфекция", "диарея", "энтеросорбент", "интоксикация"),
+    "рвота": ("тошнота", "отравление", "интоксикация", "энтеросорбент"),
+    "тошнота": ("отравление", "рвота", "желудок", "диспепсия"),
+    "изжога": ("кислотность", "отрыжка", "рефлюкс", "антацид", "гастрит"),
+    "отрыжка": ("изжога", "рефлюкс", "диспепсия", "кислотность"),
+    "переедание": ("диспепсия", "тяжесть", "пищеварение", "метеоризм"),
+    "вздутие": ("метеоризм", "диспепсия", "кишечник"),
+    "горло": ("першение", "глотка", "фарингит", "тонзиллит"),
+    "глотать": ("глотка", "горло", "фарингит", "тонзиллит"),
+    "нос": ("насморк", "ринит", "заложенность"),
+    "заложить": ("заложенность", "насморк", "ринит"),
+    "насморк": ("нос", "заложенность", "ринит", "сосудосуживающее"),
+    "пыльца": ("поллиноз", "аллергия", "аллергический ринит", "конъюнктивит"),
+    "аллергия": ("зуд", "сыпь", "чихание", "антигистаминное", "поллиноз", "крапивница"),
+    "крапивница": ("аллергия", "зуд", "сыпь", "антигистаминное"),
+    "укус": ("укусы", "отек", "аллергия"),
+    "глаз": ("конъюнктивит", "блефарит", "слезотечение", "веко"),
+    "глаза": ("глаз", "конъюнктивит", "слезотечение", "блефарит"),
+    "порез": ("рана", "ссадина", "кровотечение", "антисептик", "дезинфекция"),
+    "рана": ("порез", "ссадина", "дезинфекция", "антисептик"),
+    "кровь": ("кровотечение", "рана", "порез"),
+    "обеззаразить": ("антисептик", "дезинфекция", "обработка ран"),
+    "ожог": ("ожоги", "кожа", "регенерация"),
+    "солнце": ("солнечные ожоги", "ожог", "кожа"),
+    "перелом": ("переломы", "травматический", "болевой синдром"),
+    "вывих": ("вывихи", "травматический", "болевой синдром"),
+    "укачивать": ("укачивание", "морская болезнь"),
+    "бессонница": ("засыпание", "неврозоподобный", "раздражительность"),
+    "сердце": ("стенокардия", "кардиалгия"),
+    "лопатка": ("стенокардия", "кардиалгия"),
+    "нпвп": ("обезболивающее", "противовоспалительное", "анальгетик", "жаропонижающее"),
+    "орви": ("простуда", "грипп", "температура", "лихорадка", "насморк"),
+    "простуда": ("орви", "грипп", "лихорадка", "насморк", "горло"),
     "но-шпа": ("дротаверин", "спазм"),
     "нурофен": ("ибупрофен", "обезболивающее"),
 }
 
+_SHARED_ANALYZER: MorphAnalyzer | None = None
+_LEMMA_SYNONYMS: dict[str, tuple[str, ...]] | None = None
+
+
+def _get_lemma_synonyms() -> tuple[MorphAnalyzer, dict[str, tuple[str, ...]]]:
+    global _SHARED_ANALYZER, _LEMMA_SYNONYMS
+    if _SHARED_ANALYZER is None or _LEMMA_SYNONYMS is None:
+        analyzer = MorphAnalyzer()
+        table: dict[str, tuple[str, ...]] = {}
+        for key, syns in MEDICAL_SYNONYMS.items():
+            table.setdefault(key, syns)
+            for lemma in analyzer.terms(key):
+                table.setdefault(lemma, syns)
+        _SHARED_ANALYZER = analyzer
+        _LEMMA_SYNONYMS = table
+    return _SHARED_ANALYZER, _LEMMA_SYNONYMS
+
 
 def expand_medical_query(query: str) -> str:
-    """Append domain-relevant medical synonyms and expanded abbreviations."""
+    """Append domain-relevant medical synonyms and expanded abbreviations via exact/lemma lookup."""
     normalized = normalize_text(query)
     if not normalized:
         return query
+    analyzer, lemma_synonyms = _get_lemma_synonyms()
     words = normalized.split()
+    query_lemmas = set(analyzer.terms(normalized))
     additions: list[str] = []
-    seen = set(words)
+    seen = set(words) | query_lemmas
 
     for word in words:
-        for key, synonyms in MEDICAL_SYNONYMS.items():
-            if word == key or (len(word) >= 4 and word.startswith(key[:4])):
-                for syn in synonyms:
-                    if syn not in seen:
-                        additions.append(syn)
-                        seen.add(syn)
+        candidates = [word, *analyzer.terms(word)]
+        for cand in candidates:
+            syns = lemma_synonyms.get(cand)
+            if not syns:
+                continue
+            for syn in syns:
+                if syn not in seen:
+                    additions.append(syn)
+                    seen.add(syn)
 
     if not additions:
         return query
@@ -120,13 +168,16 @@ class HybridRagIndex:
         self.bm25 = bm25_index
         self.analyzer = analyzer or MorphAnalyzer()
         self.embedder = embedder or LocalCharNgramEmbedder()
+        self._primary_bm25 = InMemoryBm25Index(params=bm25_index.params)
         self._doc_vectors: dict[str, list[float]] = {}
         self._rebuild_vectors()
 
     def _rebuild_vectors(self) -> None:
         self._doc_vectors.clear()
+        self._primary_bm25 = InMemoryBm25Index(params=self.bm25.params)
         for doc_id, doc in self.bm25.documents.items():
             self._doc_vectors[doc_id] = self.embedder.embed(doc.full_text())
+            self._primary_bm25.add_document(doc, self.analyzer.terms(doc.primary_text()))
 
     @property
     def documents(self) -> Mapping[str, MedicineDocument]:
@@ -188,32 +239,35 @@ class HybridRagIndex:
         bm25_exp_res = self.bm25.search(bm25_exp_terms, top_k=max(top_k * 2, 10))
         dense_res = self.search_dense(query, top_k=max(top_k * 2, 10))
 
-        # Typo-tolerant boost for direct drug name mentions
-        fuzzy_ids = [doc.id for doc in self.suggest_fuzzy(query, threshold=0.25, limit=3)]
+        # Typo-tolerant boost for direct drug name mentions only (avoid noise on common words)
+        fuzzy_ids = [doc.id for doc in self.suggest_fuzzy(query, threshold=0.35, limit=3)]
         for tok in normalize_text(query).split():
             if len(tok) >= 5:
-                for doc in self.suggest_fuzzy(tok, threshold=0.32, limit=2):
+                for doc in self.suggest_fuzzy(tok, threshold=0.45, limit=2):
                     if doc.id not in fuzzy_ids:
                         fuzzy_ids.append(doc.id)
 
-        top_bm25 = max(
-            bm25_raw_res[0].score if bm25_raw_res else 0.0,
-            bm25_exp_res[0].score if bm25_exp_res else 0.0,
+        prim_raw_res = self._primary_bm25.search(bm25_raw_terms, top_k=top_k)
+        prim_exp_res = self._primary_bm25.search(bm25_exp_terms, top_k=top_k)
+        top_primary = max(
+            prim_raw_res[0].score if prim_raw_res else 0.0,
+            prim_exp_res[0].score if prim_exp_res else 0.0,
         )
         top_dense = dense_res[0].score if dense_res else 0.0
         if (
             bm25_min_gate > 0.0
-            and top_bm25 < bm25_min_gate
-            and top_dense < 0.25
+            and top_primary < bm25_min_gate
+            and top_dense < 0.34
             and not fuzzy_ids
         ):
             return []
 
-        bm25_ids = [r.doc_id for r in (bm25_exp_res or bm25_raw_res)]
+        bm25_raw_ids = [r.doc_id for r in bm25_raw_res]
+        bm25_exp_ids = [r.doc_id for r in (bm25_exp_res or bm25_raw_res)]
         dense_ids = [r.doc_id for r in dense_res]
 
         fused = reciprocal_rank_fusion(
-            bm25_ids, dense_ids, fuzzy_ids, k=rrf_k, top_k=top_k
+            bm25_raw_ids, bm25_exp_ids, dense_ids, fuzzy_ids, k=rrf_k, top_k=top_k
         )
         results: list[SearchResult] = []
         for doc_id, rrf_score in fused:
