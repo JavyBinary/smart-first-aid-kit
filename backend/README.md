@@ -5,9 +5,9 @@
 ## Архитектура
 - **Фреймворк:** FastAPI (Python 3.12, Uvicorn + SSE).
 - **СУБД:** PostgreSQL 17 + `pg_trgm` (SQLAlchemy 2.0 async Core + Alembic миграции `0001`, `0002`).
-- **Кэш и безопасность:** Redis 7 (`RedisRateLimiter`, `RedisTokenBlacklist`), CSRF `ForbiddenOriginMiddleware`, Argon2id + Refresh Token Rotation.
-- **Поисковое ядро RAG:** собственный **BM25** (`pymorphy3`), контекстное чанкирование, **Hybrid Search (BM25 + Dense + RRF)**, таблица ревизий в PostgreSQL и Ablation Benchmark (`medai.rag`).
-- **Агент и LLM:** потоковый `LiteLLMProvider`, цикл `Agent` + `ToolRegistry` (`search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`) и двухслойные `Guardrails`.
+- **Кэш и безопасность:** Redis 7 (`RedisRateLimiter`, `RedisTokenBlacklist`), CSRF `ForbiddenOriginMiddleware`, Argon2id + Refresh Token Rotation, `PATCH /api/v1/auth/me`.
+- **Поисковое ядро RAG:** собственный **BM25** (`pymorphy3`), контекстное чанкирование, **Hybrid Search (BM25 + Dense + RRF)**, приоритет препаратов домашней аптечки, таблица ревизий в PostgreSQL и Ablation Benchmark (`medai.rag`).
+- **Агент и LLM:** потоковый `LiteLLMProvider` (с ретраями при `RateLimitError`), предзагрузка релевантного контекста в `_build_patient_context_prompt`, цикл `Agent` + `ToolRegistry` (`search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`), чистый текстовый вывод (`strip_markdown`), двухслойные `Guardrails` и расчет доз по весу/возрасту/хроническим диагнозам.
 - **Озвучка (TTS):** нейросетный синтез MP3 через `edge-tts` (`baya`, `kseniya`, `xenia`, `aidar`, `eugene`) на `/api/v1/speech/synthesize` и `/api/v1/dialogs/{id}/messages/{msg_id}/audio`.
 - **Наблюдаемость:** структурированное JSON/human логирование с контекстом (`request_id`, `dialog_id`, `call_id`) и фильтром от утечек ПДн.
 
