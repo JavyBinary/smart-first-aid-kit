@@ -47,13 +47,16 @@ make bench
 1. **Hybrid RAG в PostgreSQL (`backend/src/medai/rag/`):**
    - Собственная реализация **BM25** ($k_1 = 1.5$, $b = 0.75$) с русской лемматизацией `pymorphy3`.
    - Структурированное контекстное чанкирование, расширение синонимами, плотные эмбеддинги + **Reciprocal Rank Fusion (RRF)** и нечёткий поиск по триграммам `pg_trgm`.
+   - Приоритизация непросроченных препаратов из домашней аптечки пользователя (`_kit_priority`), автоматическое подмешивание релевантных позиций аптечки и проверка персональных конфликтов по выбранному средству.
    - CLI управления корпусом (`check`, `load`, `export`, `delete`, `restore`, `search`, `benchmark`) и версионирование ревизий в PostgreSQL (`rag_loads`, `rag_revisions`).
 2. **Агент, LLM и медицинская безопасность (`backend/src/medai/agent/`):**
-   - Потоковый `LiteLLMProvider` (OpenAI, Groq, OpenRouter, Ollama) + `Agent` и `ToolRegistry` (`search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`).
-   - Автоматический перекрёстный контроль **аллергий, хронических заболеваний (гастрит/язва), дублей действующих веществ (Парацетамол + Пенталгин) и сроков годности**.
+   - Потоковый `LiteLLMProvider` (OpenAI, Groq, OpenRouter, Ollama) с ретраями при `RateLimitError`, предзагрузкой релевантного контекста RAG и `Agent` + `ToolRegistry` (`search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`).
+   - Изолированная память диалогов (окно до 20 сообщений на диалог и локальная история для гостевых сессий `/api/v1/chat/query`), вывод чистым текстом без Markdown (`strip_markdown`).
+   - Автоматический перекрёстный контроль **аллергий, хронических заболеваний (ЖКТ, гипертония/ИБС, почки, диабет, глаукома, беременность/лактация), дублей действующих веществ (Парацетамол + Пенталгин), сроков годности, возраста (`<12`, `<15`, `65+`) и массы тела (расчет мг/кг)**.
    - Двухслойные `Guardrails`: защита от Prompt Injection, экстренные протоколы 112 (Red Flags + 15-минутный таймер при ожоге), отсечение нецелевых запросов (`out_of_domain`) и безопасный fallback при отсутствии `LLM_API_KEY`.
-3. **Аутентификация, CSRF, TTS и Admin 2.0:**
-   - `HttpOnly` cookie JWT (Argon2id + SHA-256 refresh rotation), `RedisRateLimiter`, `RedisTokenBlacklist` и `ForbiddenOriginMiddleware` (`Sec-Fetch-Site`).
+3. **Аутентификация, Аптечка/Медкарта, CSRF, TTS и Admin 2.0:**
+   - `HttpOnly` cookie JWT (Argon2id + SHA-256 refresh rotation), `PATCH /api/v1/auth/me`, `RedisRateLimiter`, `RedisTokenBlacklist`, `ForbiddenOriginMiddleware` (`Sec-Fetch-Site`) и скрытие кнопки админ-панели для обычных пользователей.
+   - Редактируемая домашняя аптечка (`PUT /api/v1/kit/items/{id}`) с видимыми бейджами сроков годности, витрина «Аптека» из **46 настраиваемых препаратов** (выбор дозировки/формы, даты годности и количества) и справочник Медкарты (**62 диагноза** и **45 аллергенов**).
    - Нейросетный синтез речи MP3 (`edge-tts`: 5 русских голосов `baya`, `kseniya`, `xenia`, `aidar`, `eugene`) с клиентским fallback на браузерный `SpeechSynthesis`.
    - Живая панель администратора на данных PostgreSQL: статистика `7/30/90`, оценки `1..5`, модерация жалоб, CRUD корпуса лекарств и живой Ablation-бенчмарк.
 
@@ -72,6 +75,6 @@ make bench
 ├── docker/                    # compose.yaml, compose.test.yaml, Dockerfile, Caddyfile, .env.example
 ├── docs/                      # Архитектурный каталог, ERD, контракты API, формулы BM25/RRF и Benchmark
 ├── frontend/                  # Модульный SPA (index.html, login.html, admin.html, src/, tests/)
-├── specs/                     # Реестр статусов (status.yaml) и пакеты спецификаций SDD (001–026)
+├── specs/                     # Реестр статусов (status.yaml) и пакеты спецификаций SDD (001–027)
 └── ui/                        # Утвержденный интерфейс КТ1 (дизайн Каты)
 ```
