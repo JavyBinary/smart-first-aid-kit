@@ -4,6 +4,23 @@
 
 ---
 
+## [0.6.1-rag-kit-priority-and-sdd-sync] — 2026-11-27
+### Предзагрузка RAG, ретраи RateLimitError, точный приоритет однокомпонентных лекарств из аптечки и актуализация SDD/документации (Ветка: main)
+
+#### Исправлено и добавлено:
+- **Приоритизация однокомпонентных средств из аптечки (`backend/src/medai/dialogs/service.py`):**
+  - В `_synthesize_rag` добавлено включение релевантных симптому препаратов из `user_kit_names` по лемматизированному пересечению запроса и `primary_text()`.
+  - Выбор безопасного кандидата (`chosen_doc`) теперь опирается только на личные конфликты top-1 препарата (`АЛЛЕРГИЯ`, `МЕДКАРТА`, `ПРОСРОЧЕНО`), благодаря чему межлекарственные предупреждения среди топ-3 больше не переключают `Парацетамол` на комбинированный `Пенталгин`.
+  - В `_find_docs_for_pills` добавлена сортировка по `_kit_match_strength` и длине названия.
+- **Производительность и устойчивость LLM (`backend/src/medai/config.py`, `litellm.py`, `system.md`, `service.py`):**
+  - Предзагруженные инструкции (`preloaded_sources`) и `safety_warnings` теперь передаются прямо в системный контекст `_build_patient_context_prompt`, сокращая число лишних вызовов инструментов.
+  - Значение `LiteLLMProviderConfig.num_retries` по умолчанию повышено до `2`; в `LiteLLMProvider.stream` добавлен экспоненциальный backoff-retry при `RateLimitError` / `429` до получения первого чанка ответа.
+- **Тесты, SDD и документация:**
+  - Добавлены unit-тесты `test_headache_prioritizes_valid_paracetamol_in_kit_over_combo_and_ibuprofen`, `test_quirky_off_corpus_question_keeps_recommendation_none_with_live_llm` и `test_litellm_provider_retries_rate_limit` в `backend/tests/test_agent_and_safety.py`.
+  - Оформлен пакет спецификации SDD `specs/changes/027-ux-dialog-memory-kit-priority-and-safety/` и актуализированы `README.md`, `backend/README.md`, `docs/`.
+
+---
+
 ## [0.6.0-ux-memory-kit-overhaul] — 2026-11-27
 ### Память диалогов, приоритет аптечки, живой ИИ без Markdown и расширение Аптеки/Медкарты (Ветка: main)
 
