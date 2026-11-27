@@ -16,7 +16,8 @@
 | `POST /api/v1/auth/refresh` | Ротация access/refresh токенов | Cookie `refresh_token` $\rightarrow$ `UserResponse` |
 | `POST /api/v1/auth/logout` | Выход и отзыв JWT в Redis | `200 {"status": "logged_out"}` |
 | `POST /api/v1/auth/change-password` | Смена пароля и отзыв сессий | `{old_password, new_password}` |
-| `GET /api/v1/auth/me` | Профиль текущего пользователя | `UserResponse {id, email, name, role}` |
+| `GET /api/v1/auth/me` | Профиль текущего пользователя | `UserResponse {id, email, name, role, avatar_color}` |
+| `PATCH /api/v1/auth/me` | Обновление имени и цвета аватара | `{name?, avatar_color?}` $\rightarrow$ `UserResponse` |
 | `GET /api/v1/auth/admin/users` | Список пользователей (Admin) | `list[UserResponse]` |
 | `PATCH /api/v1/auth/admin/users/{id}/role` | Смена роли `user` / `admin` (Admin) | `{role}` $\rightarrow$ `UserResponse` |
 
@@ -27,7 +28,7 @@
 ### 2.1. Аптечка (`/api/v1/kit`)
 - `GET /api/v1/kit` $\rightarrow$ `{items: KitItem[], total: int}` (с вычисляемым полем `is_expired`).
 - `POST /api/v1/kit/items`: `{id?, name, dosage, form, category, tags: string[], quantity: int >= 1, expiry: "YYYY-MM-DD", status: "otc" | "rx"}`.
-- `PUT /api/v1/kit/items/{id}`: `{dosage?, quantity?, expiry?, status?}`.
+- `PUT /api/v1/kit/items/{id}`: `{name?, form?, category?, tags?, dosage?, quantity?, expiry?, status?}`.
 - `DELETE /api/v1/kit/items/{id}` $\rightarrow$ `200 {"status": "deleted"}`.
 
 ### 2.2. Профиль здоровья (`/api/v1/profile`)
@@ -49,7 +50,7 @@
 - `GET /api/v1/reports/news` $\rightarrow$ `{news: [{report_id, dialog_id, dialog_title}]}` и `POST /api/v1/reports/news/seen`: `{report_ids}`.
 - `POST /api/v1/dialogs/{id}/messages/{msg_id}/audio`: `{voice}` $\rightarrow$ `202` (`{status: "ready", voice, audio_url}` с последующей отдачей MP3 по `GET .../audio?voice=...` при `SPEECH_ENABLED=true`) или `503` (если серверный TTS отключен; клиент использует fallback Web Speech API).
 - `POST /api/v1/speech/synthesize`: `{text, voice}` $\rightarrow$ `200 audio/mpeg` (нейросетный синтез MP3 через `edge-tts` для 5 голосов `baya`, `kseniya`, `xenia`, `aidar`, `eugene`) или `503`.
-- `POST /api/v1/chat/query` — синхронный RAG+Agent фасад для гостевого режима и резервного ответа.
+- `POST /api/v1/chat/query`: `{query, user_kit_names?, user_kit_items?, selected_pills?, health_profile?, response_depth?, history?}` — синхронный RAG+Agent фасад для гостевого режима и резервного ответа с изоляцией истории диалога.
 
 ---
 
