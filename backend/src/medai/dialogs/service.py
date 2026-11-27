@@ -101,20 +101,27 @@ def strip_markdown(text: str) -> str:
     return cleaned.strip()
 
 
-def _matches_kit_item(doc: MedicineDocument, item_name: str) -> bool:
+def _kit_match_strength(doc: MedicineDocument, item_name: str) -> int:
+    """Return 2 for direct drug match, 1 for multi-ingredient INN overlap, 0 otherwise."""
     norm_name = normalize_text(item_name)
     if not norm_name:
-        return False
+        return 0
     norm_title = normalize_text(doc.title)
     norm_inn = normalize_text(doc.inn)
-    if norm_name in norm_title or norm_title in norm_name or norm_name in norm_inn:
-        return True
+    if norm_name in norm_title or norm_title in norm_name or norm_name == norm_inn:
+        return 2
+    first_word = norm_title.split("(")[0].strip().split()[0] if norm_title else ""
+    if len(first_word) >= 4 and first_word in norm_name:
+        return 2
     for part in norm_inn.split("+"):
         p = part.strip()
         if len(p) >= 4 and p in norm_name:
-            return True
-    first_word = norm_title.split("(")[0].strip().split()[0] if norm_title else ""
-    return len(first_word) >= 4 and first_word in norm_name
+            return 1
+    return 0
+
+
+def _matches_kit_item(doc: MedicineDocument, item_name: str) -> bool:
+    return _kit_match_strength(doc, item_name) > 0
 
 
 class DialogService:
@@ -436,30 +443,36 @@ class DialogService:
                 seen_ids.add(r.doc_id)
                 combined_results.append(r)
 
-        # Compatibility fallback for callers passing pill names only via user_kit_names with vague query
-        if not combined_results and user_kit_names:
+        # Only fall back to arbitrary user_kit_names when LLM is disabled AND query itself looked vague
+        # (never force a medicine card onto playful/off-corpus health questions when live LLM handles them).
+        if not combined_results and user_kit_names and not self._can_use_llm():
             combined_results = self._find_docs_for_pills(user_kit_names)
 
-        # Prioritize valid (non-expired) medicines present in the user's first aid kit
+        # Prioritize direct valid (non-expired) medicines present in the user's first aid kit
         effective_kit = kit_items or [{"name": n, "is_expired": False} for n in (user_kit_names or [])]
         pill_id_set = {r.doc_id for r in pill_results}
 
         def _kit_priority(sr: SearchResult) -> tuple[int, float]:
             if sr.doc_id in pill_id_set:
                 return (0, -sr.score)
-            matching_kit = [it for it in effective_kit if _matches_kit_item(sr.document, str(it.get("name", "")))]
-            if matching_kit:
-                has_valid = any(not it.get("is_expired") for it in matching_kit)
+            matches = [
+                (it, _kit_match_strength(sr.document, str(it.get("name", ""))))
+                for it in effective_kit
+            ]
+            matches = [(it, lvl) for it, lvl in matches if lvl > 0]
+            if matches:
+                max_lvl = max(lvl for _, lvl in matches)
+                has_valid = any(not it.get("is_expired") for it, _ in matches)
                 cand_warns = analyze_medicine_safety(
                     [sr.document], health_profile=health_profile, user_kit_items=effective_kit
                 )
                 has_severe = any("АЛЛЕРГИЯ" in w or "ПРОСРОЧЕНО" in w or "МЕДКАРТА" in w for w in cand_warns)
                 if has_valid and not has_severe:
-                    return (1, -sr.score)
+                    return (1 if max_lvl == 2 else 2, -sr.score)
                 if has_valid:
-                    return (2, -sr.score)
-                return (4, -sr.score)
-            return (3, -sr.score)
+                    return (3, -sr.score)
+                return (5, -sr.score)
+            return (4, -sr.score)
 
         search_results = sorted(combined_results, key=_kit_priority)
 
