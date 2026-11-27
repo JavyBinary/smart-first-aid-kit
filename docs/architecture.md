@@ -57,11 +57,12 @@ flowchart TD
 
 ### 1.1. Сквозной путь симптоматического запроса
 
-1. **Вход и защита от атак:** Клиент отправляет `POST /api/v1/dialogs/{id}/messages` (SSE-поток) или `POST /api/v1/chat/query` (синхронный фасад). Первый слой проверяет запрос на Prompt Injection (`detect_prompt_injection`), экстренные состояния (`detect_emergency` — Red Flag) и нецелевой домен (`detect_out_of_domain`).
-2. **Гибридный поиск (BM25 + Dense + RRF):** Поисковое ядро строит леммы (`pymorphy3`), расширяет запрос медицинскими синонимами, объединяет скоринг BM25 и плотных векторов через RRF:
+1. **Вход и защита от атак:** Клиент отправляет `POST /api/v1/dialogs/{id}/messages` (SSE-поток) или `POST /api/v1/chat/query` (синхронный фасад с историей локальной сессии). Первый слой проверяет запрос на Prompt Injection (`detect_prompt_injection`), экстренные состояния (`is_emergency_query` — Red Flag) и нецелевой домен (`is_out_of_domain_query`).
+2. **Гибридный поиск (BM25 + Dense + RRF) и приоритет аптечки:** Поисковое ядро строит леммы (`pymorphy3`), расширяет запрос медицинскими синонимами, объединяет скоринг BM25 и плотных векторов через RRF:
    $$RRF(d) = \sum_{r \in \{BM25, Dense\}} \frac{w_r}{k_r + \text{rank}_r(d)}$$
-3. **Агентский цикл с инструментами безопасности (`Agent` Runtime):** При наличии `LLM_API_KEY` агент вызывает инструменты: `search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions` (аллергии, хронические заболевания, дубли МНН, просроченные препараты, возраст/вес). При отсутствии API-ключа включается детерминированный безопасный fallback с теми же проверками.
-4. **Верификация ответа (Output Grounding):** Финальный ответ проходит проверку опоры на источники (`verify_output_grounding`), передается по SSE (`message_start` $\rightarrow$ `message_delta` $\rightarrow$ `message_end`) и сохраняется в PostgreSQL.
+   При наличии подходящих непросроченных препаратов в аптечке пользователя они получают высший приоритет, а проверка личных конфликтов удерживает точное совпадение (например, `Парацетамол` вместо комбинированных аналогов).
+3. **Агентский цикл с инструментами безопасности (`Agent` Runtime):** При наличии `LLM_API_KEY` агент получает профиль пациента, состав аптечки со сроками годности, до 20 сообщений истории и предзагруженные инструкции релевантных препаратов, а при необходимости вызывает `search_medicines`, `lookup_medicine`, `get_user_safety_context`, `check_drug_interactions`. `LiteLLMProvider` поддерживает ретраи (`num_retries = 2`) при `RateLimitError`. При отсутствии API-ключа включается детерминированный безопасный fallback.
+4. **Верификация ответа и очистка вывода:** Финальный ответ проходит проверку опоры на источники (`verify_output_grounding`) и очистку от Markdown (`strip_markdown`), передается по SSE (`message_start` $\rightarrow$ `message_delta` $\rightarrow$ `message_end`) и сохраняется в PostgreSQL.
 
 ---
 
