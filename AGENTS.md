@@ -24,8 +24,7 @@ specify -> plan -> implement -> verify
 
 | Разработчик | Роль в проекте | Закрепленные модули и спецификации |
 |---|---|---|
-| **Лука (Тимлид)** | Архитектура SDD, RAG & Data | Общая архитектура системы, управление SDD, ядро BM25, токенизация и лемматизация, бенчмаркинг ($MRR$, $Recall@k$), [docs/bm25.md](docs/bm25.md), [docs/rag.md](docs/rag.md), [docs/benchmark.md](docs/benchmark.md). |
-| **Полина** | Backend & API | Контракты REST API [docs/api.md](docs/api.md), серверный слой FastAPI, Pydantic-схемы, инвентарь аптечки, интеграция с LLM, база данных PostgreSQL. |
+| **Лука (Тимлид)** | Архитектура SDD, RAG & Data, Backend & API | Общая архитектура системы, управление SDD, ядро BM25, токенизация и лемматизация, бенчмаркинг ($MRR$, $Recall@k$), [docs/bm25.md](docs/bm25.md), [docs/rag.md](docs/rag.md), [docs/benchmark.md](docs/benchmark.md), контракты REST API [docs/api.md](docs/api.md), серверный слой FastAPI, Pydantic-схемы, инвентарь аптечки, интеграция с LLM, база данных PostgreSQL. |
 | **Катя** | Frontend & UI/UX | Клиентский интерфейс [ui/auth.html](ui/auth.html), [ui/site.html](ui/site.html), [ui/admin.html](ui/admin.html), дизайн-система, [docs/ui.md](docs/ui.md). Разработка ведется в отдельной ветке. |
 
 ---

@@ -11,8 +11,7 @@
 
 ## 1. Команда и роли
 
-- **Лука (Тимлид):** Архитектура SDD, ядро BM25 + Hybrid RAG (чанкирование, `pymorphy3`, Dense + RRF, `pg_trgm`), бенчмаркинг ($MRR$, $Recall@k$, Accuracy, Faithfulness).
-- **Полина:** Backend & API на FastAPI, Agent Runtime + LiteLLM, инструменты клинической безопасности, PostgreSQL/Alembic, Redis security, Admin 2.0, TTS.
+- **Лука (Тимлид, Backend & RAG):** Архитектура SDD, ядро BM25 + Hybrid RAG (чанкирование, `pymorphy3`, Dense + RRF, `pg_trgm`), бенчмаркинг ($MRR$, $Recall@k$, Accuracy, Faithfulness), Backend & API на FastAPI, Agent Runtime + LiteLLM, инструменты клинической безопасности, PostgreSQL/Alembic, Redis security, Admin 2.0, TTS.
 - **Катя:** Дизайн-система и клиентский интерфейс КТ1 (`ui/auth.html`, `ui/site.html`, `ui/admin.html`) и модульный SPA-контур (`frontend/`).
 
 ---

@@ -1818,7 +1818,7 @@
     renderList();
     closeModal();
 
-    // Фоновая синхронизация с FastAPI Полины
+    // Фоновая синхронизация с FastAPI Луки
     fetch(`${API_BASE}/kit/items`, {
       method: 'POST',
       headers: {
@@ -2124,7 +2124,7 @@
 
     addTyping();
 
-    // 1. Попытка запроса к реальному бэкенду Полины
+    // 1. Попытка запроса к реальному бэкенду (FastAPI)
     try {
       const res = await fetch(`${API_BASE}/chat/query`, {
         method: 'POST',
