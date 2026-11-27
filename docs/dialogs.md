@@ -40,13 +40,18 @@ sequenceDiagram
     API-->>Client: 202 Accepted
 
     Service-->>Client: event: message_start
-    Service->>Service: Проверка Prompt Injection, Red Flags, OOD
-    Service->>Agent: run(query, kit_items, health_profile, response_depth)
-    Agent->>Agent: Поиск Hybrid RAG + check_drug_interactions
-    Agent-->>Service: grounded response + safety_warnings + recommendation
+    Service->>Service: Проверка Prompt Injection, Red Flags, OOD + синтез приоритета аптечки
+    Service->>Agent: run(history[-20:], query, kit_items, health_profile, preloaded_docs, response_depth)
+    Agent->>Agent: Учет предзагруженного контекста / Hybrid RAG + safety-анализ
+    Agent-->>Service: plain-text response (strip_markdown) + safety_warnings + recommendation
     Service->>DB: append_exchange(user_msg, assistant_msg, rag_payload)
     Service-->>Client: event: message_end {"message_id", "recommendation", "safety_warnings", "sources", "used_llm"}
 ```
+
+### Особенности контекста и вывода
+- **Изолированная память диалогов:** в серверном режиме передаются последние 20 сообщений (`transcript.messages[-20:]`) конкретного `dialog_id`; в гостевом/fallback режиме `/api/v1/chat/query` принимает `history` конкретного локального `sessionId`.
+- **Чистый текст без Markdown:** промпт `system.md`, `strip_markdown()` на сервере и `stripMarkdownForDisplay()` на клиенте убирают служебные символы разметки (`**`, `###`, `` ` ``).
+- **Живой диалог на нестандартные вопросы:** при работе живой LLM запросы без совпадений в корпусе препаратов получают дружелюбный ответ без навязывания карточки лекарства (`recommendation: null`).
 
 ---
 
