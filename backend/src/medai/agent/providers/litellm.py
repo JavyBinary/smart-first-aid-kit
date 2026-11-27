@@ -166,89 +166,112 @@ class LiteLLMProvider(LLMProvider):
                 message_count=len(messages),
                 tool_count=len(tools),
             )
-            try:
-                request = self._build_request(messages, tools, max_tokens)
-                response_stream = await litellm_sdk.acompletion(**request)
+            max_attempts = 1 + max(int(self._config.num_retries or 0), 0)
+            rate_limit_exc = getattr(litellm_sdk, "RateLimitError", ())
+            result: LLMResponse | None = None
 
-                content_parts: list[str] = []
-                reasoning_parts: list[str] = []
-                tool_call_parts: dict[int, _ToolCallParts] = {}
+            for attempt in range(max_attempts):
                 saw_choice = False
+                content_parts = []
+                reasoning_parts = []
+                tool_call_parts = {}
+                try:
+                    request = self._build_request(messages, tools, max_tokens)
+                    response_stream = await litellm_sdk.acompletion(**request)
 
-                async for chunk in response_stream:
-                    chunk_usage = getattr(chunk, "usage", None)
-                    if chunk_usage is not None:
-                        usage = {
-                            "input_tokens": int(getattr(chunk_usage, "prompt_tokens", 0) or 0),
-                            "output_tokens": int(
-                                getattr(chunk_usage, "completion_tokens", 0) or 0
-                            ),
-                            "total_tokens": int(getattr(chunk_usage, "total_tokens", 0) or 0),
-                        }
-                    choices = getattr(chunk, "choices", None)
-                    if not choices:
+                    async for chunk in response_stream:
+                        chunk_usage = getattr(chunk, "usage", None)
+                        if chunk_usage is not None:
+                            usage = {
+                                "input_tokens": int(getattr(chunk_usage, "prompt_tokens", 0) or 0),
+                                "output_tokens": int(
+                                    getattr(chunk_usage, "completion_tokens", 0) or 0
+                                ),
+                                "total_tokens": int(getattr(chunk_usage, "total_tokens", 0) or 0),
+                            }
+                        choices = getattr(chunk, "choices", None)
+                        if not choices:
+                            continue
+                        saw_choice = True
+                        delta = choices[0].delta
+                        content = getattr(delta, "content", None)
+                        external_tool_calls = getattr(delta, "tool_calls", None) or ()
+                        reasoning = getattr(delta, "reasoning_content", None)
+
+                        if reasoning:
+                            reasoning_parts.append(reasoning)
+
+                        if content:
+                            if first_token_ms is None:
+                                first_token_ms = round((time.monotonic() - started) * 1000, 3)
+                            content_parts.append(content)
+                            yield LLMTextDelta(content=content)
+
+                        for ext_call in external_tool_calls:
+                            index = ext_call.index
+                            parts = tool_call_parts.setdefault(index, _ToolCallParts())
+                            if ext_call.id is not None:
+                                parts.id += ext_call.id
+                            func = ext_call.function
+                            if func.name is not None:
+                                parts.name += func.name
+                            if func.arguments is not None:
+                                parts.arguments += func.arguments
+
+                    if not saw_choice:
+                        raise TypeError("LLM stream returned zero choices.")
+
+                    if tool_call_parts:
+                        result = LLMResponse(
+                            tool_calls=_build_tool_calls(tool_call_parts),
+                            reasoning_content="".join(reasoning_parts) or None,
+                            usage=usage,
+                        )
+                    else:
+                        result = LLMResponse(
+                            content="".join(content_parts),
+                            usage=usage,
+                        )
+                    break
+                except asyncio.CancelledError:
+                    log_event(
+                        logger,
+                        logging.INFO,
+                        "llm.request.cancelled",
+                        model=self._config.model,
+                        started_at=started_at,
+                        duration_ms=round((time.monotonic() - started) * 1000, 3),
+                    )
+                    raise
+                except Exception as error:
+                    err_text = str(error).lower()
+                    is_rate_limit = bool(rate_limit_exc and isinstance(error, rate_limit_exc)) or (
+                        "rate limit" in err_text or "rate_limit" in err_text or "429" in err_text
+                    )
+                    if is_rate_limit and not saw_choice and attempt + 1 < max_attempts:
+                        backoff_seconds = min(1.5 * (2**attempt), 6.0)
+                        log_event(
+                            logger,
+                            logging.WARNING,
+                            "llm.request.rate_limited_retry",
+                            model=self._config.model,
+                            iteration=attempt + 1,
+                            error_type=type(error).__name__,
+                        )
+                        await asyncio.sleep(backoff_seconds)
                         continue
-                    saw_choice = True
-                    delta = choices[0].delta
-                    content = getattr(delta, "content", None)
-                    external_tool_calls = getattr(delta, "tool_calls", None) or ()
-                    reasoning = getattr(delta, "reasoning_content", None)
-
-                    if reasoning:
-                        reasoning_parts.append(reasoning)
-
-                    if content:
-                        if first_token_ms is None:
-                            first_token_ms = round((time.monotonic() - started) * 1000, 3)
-                        content_parts.append(content)
-                        yield LLMTextDelta(content=content)
-
-                    for ext_call in external_tool_calls:
-                        index = ext_call.index
-                        parts = tool_call_parts.setdefault(index, _ToolCallParts())
-                        if ext_call.id is not None:
-                            parts.id += ext_call.id
-                        func = ext_call.function
-                        if func.name is not None:
-                            parts.name += func.name
-                        if func.arguments is not None:
-                            parts.arguments += func.arguments
-
-                if not saw_choice:
-                    raise TypeError("LLM stream returned zero choices.")
-
-                if tool_call_parts:
-                    result = LLMResponse(
-                        tool_calls=_build_tool_calls(tool_call_parts),
-                        reasoning_content="".join(reasoning_parts) or None,
-                        usage=usage,
+                    log_event(
+                        logger,
+                        logging.ERROR,
+                        "llm.request.failed",
+                        model=self._config.model,
+                        error_type=type(error).__name__,
+                        started_at=started_at,
+                        duration_ms=round((time.monotonic() - started) * 1000, 3),
                     )
-                else:
-                    result = LLMResponse(
-                        content="".join(content_parts),
-                        usage=usage,
-                    )
-            except asyncio.CancelledError:
-                log_event(
-                    logger,
-                    logging.INFO,
-                    "llm.request.cancelled",
-                    model=self._config.model,
-                    started_at=started_at,
-                    duration_ms=round((time.monotonic() - started) * 1000, 3),
-                )
-                raise
-            except Exception as error:
-                log_event(
-                    logger,
-                    logging.ERROR,
-                    "llm.request.failed",
-                    model=self._config.model,
-                    error_type=type(error).__name__,
-                    started_at=started_at,
-                    duration_ms=round((time.monotonic() - started) * 1000, 3),
-                )
-                raise LLMProviderError("LLM provider request failed.") from error
+                    raise LLMProviderError("LLM provider request failed.") from error
+
+            assert result is not None
 
             log_event(
                 logger,

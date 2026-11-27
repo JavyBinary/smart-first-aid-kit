@@ -49,7 +49,7 @@ from medai.kit.stores import KitStore
 from medai.observability import log_event
 from medai.profile.stores import ProfileStore
 from medai.rag.analyzer import MorphAnalyzer, TextAnalyzer, normalize_text
-from medai.rag.hybrid import HybridRagIndex
+from medai.rag.hybrid import HybridRagIndex, expand_medical_query
 from medai.rag.index import InMemoryBm25Index
 from medai.rag.models import MedicineDocument, SearchResult
 
@@ -353,6 +353,9 @@ class DialogService:
                 for d in self._hybrid_index.documents.values()
                 if q in normalize_text(d.title) or q in normalize_text(d.inn)
             ]
+            matched_docs.sort(
+                key=lambda d: (-_kit_match_strength(d, name), len(d.title))
+            )
             if not matched_docs:
                 matched_docs = self._hybrid_index.suggest_fuzzy(
                     name, threshold=0.25, limit=1
@@ -443,6 +446,22 @@ class DialogService:
                 seen_ids.add(r.doc_id)
                 combined_results.append(r)
 
+        # Ensure symptom-relevant medicines from the user's kit enter the candidate pool
+        # even if top-8 RRF missed them (never inject unrelated kit items on off-corpus queries).
+        if combined_results and user_kit_names:
+            q_terms = {
+                t for t in self._analyzer.terms(expand_medical_query(query)) if len(t) >= 3
+            }
+            for sr in self._find_docs_for_pills(user_kit_names):
+                if sr.doc_id in seen_ids:
+                    continue
+                doc_terms = {
+                    t for t in self._analyzer.terms(sr.document.primary_text()) if len(t) >= 3
+                }
+                if q_terms & doc_terms:
+                    seen_ids.add(sr.doc_id)
+                    combined_results.append(sr)
+
         # Only fall back to arbitrary user_kit_names when LLM is disabled AND query itself looked vague
         # (never force a medicine card onto playful/off-corpus health questions when live LLM handles them).
         if not combined_results and user_kit_names and not self._can_use_llm():
@@ -498,14 +517,27 @@ class DialogService:
             user_kit_items=kit_items,
         )
 
-        # Pick safest candidate from top-3 if top-1 triggers allergy/chronic conflict
+        # Pick safest candidate from top-3 only if top-1 itself has a personal allergy/chronic/expiry conflict
         chosen_doc = docs[0]
-        if safety_warnings and len(docs) > 1:
+        top_warns = analyze_medicine_safety(
+            [chosen_doc], health_profile=health_profile, user_kit_items=kit_items
+        )
+        has_top_conflict = any(
+            marker in w
+            for w in top_warns
+            for marker in ("АЛЛЕРГИЯ", "МЕДКАРТА", "ПРОСРОЧЕНО")
+        )
+        if has_top_conflict and len(docs) > 1:
             for cand in docs[1:]:
                 cand_warns = analyze_medicine_safety(
                     [cand], health_profile=health_profile, user_kit_items=kit_items
                 )
-                if not cand_warns:
+                cand_conflict = any(
+                    marker in w
+                    for w in cand_warns
+                    for marker in ("АЛЛЕРГИЯ", "МЕДКАРТА", "ПРОСРОЧЕНО")
+                )
+                if not cand_conflict:
                     chosen_doc = cand
                     break
 
@@ -582,6 +614,8 @@ class DialogService:
         self,
         safety_snapshot: dict[str, Any],
         selected_pills: list[str],
+        preloaded_sources: list[dict[str, Any]] | None = None,
+        preloaded_warnings: list[str] | None = None,
     ) -> str:
         profile = safety_snapshot.get("health_profile") or {}
         age = profile.get("age", 25)
@@ -615,6 +649,30 @@ class DialogService:
         if selected_pills:
             lines.append(f"- Явно выбраны пользователем в сообщении: {', '.join(selected_pills)}")
         lines.append("Домашняя аптечка пользователя:\n" + kit_block)
+
+        if preloaded_sources and self._hybrid_index is not None:
+            doc_blocks: list[str] = []
+            for src in preloaded_sources[:3]:
+                doc_id = str(src.get("doc_id") or "")
+                doc = self._hybrid_index.documents.get(doc_id)
+                if doc is None:
+                    continue
+                doc_blocks.append(
+                    f"[{doc.id}] {doc.title} (МНН: {doc.inn}, {doc.category}):\n"
+                    f"  Показания: {', '.join(doc.indications[:5])}\n"
+                    f"  Дозировка: {doc.dosage}\n"
+                    f"  Противопоказания: {', '.join(doc.contraindications[:4]) or 'нет данных'}\n"
+                    f"  Взаимодействия: {', '.join(doc.interactions[:3]) or 'нет данных'}"
+                )
+            if doc_blocks:
+                lines.append("Предзагруженные релевантные препараты из базы:\n" + "\n".join(doc_blocks))
+
+        if preloaded_warnings:
+            lines.append(
+                "Предупреждения безопасности по медкарте и аптечке:\n"
+                + "\n".join(f"- {w}" for w in preloaded_warnings)
+            )
+
         lines.append(
             "Напоминание: сначала проверь, что есть подходящего (и НЕ просроченного) в аптечке выше, "
             "обязательно учти возраст/вес/хронику/аллергии, и пиши ЧИСТЫМ ТЕКСТОМ без Markdown (** и ### запрещены)."
@@ -629,6 +687,9 @@ class DialogService:
         safety_snapshot: dict[str, Any],
         selected_pills: list[str],
         response_depth: str,
+        *,
+        preloaded_sources: list[dict[str, Any]] | None = None,
+        preloaded_warnings: list[str] | None = None,
     ) -> tuple[str, bool]:
         assert self._llm_provider is not None
         assert self._hybrid_index is not None
@@ -641,7 +702,12 @@ class DialogService:
                 CheckInteractionsTool(self._hybrid_index, safety_snapshot),
             ]
         )
-        patient_context = self._build_patient_context_prompt(safety_snapshot, selected_pills)
+        patient_context = self._build_patient_context_prompt(
+            safety_snapshot,
+            selected_pills,
+            preloaded_sources=preloaded_sources,
+            preloaded_warnings=preloaded_warnings,
+        )
         agent = Agent(
             llm_provider=self._llm_provider,
             tool_registry=tools,
@@ -730,6 +796,8 @@ class DialogService:
                         safety_snapshot=safety_snapshot,
                         selected_pills=selected_pills,
                         response_depth=response_depth,
+                        preloaded_sources=rag_res.get("sources"),
+                        preloaded_warnings=rag_res.get("safety_warnings"),
                     )
                     if llm_text.strip():
                         full_text = llm_text.strip()
@@ -872,6 +940,8 @@ class DialogService:
                     safety_snapshot=safety_snapshot,
                     selected_pills=list(selected_pills or []),
                     response_depth=response_depth,
+                    preloaded_sources=res.get("sources"),
+                    preloaded_warnings=res.get("safety_warnings"),
                 )
                 if llm_text.strip():
                     res["message"] = strip_markdown(llm_text.strip())

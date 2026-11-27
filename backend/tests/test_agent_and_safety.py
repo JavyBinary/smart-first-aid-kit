@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import types
 from pathlib import Path
 from uuid import uuid4
 
+import litellm as litellm_sdk
 import pytest
 
 from medai.agent import (
@@ -17,6 +19,8 @@ from medai.agent import (
     LLMProviderError,
     LLMResponse,
     LLMTextDelta,
+    Message,
+    MessageRole,
     ToolCall,
     ToolRegistry,
     UserRequest,
@@ -207,3 +211,104 @@ async def test_litellm_provider_config_and_error_isolation() -> None:
     assert res["status"] == "success"
     assert res["used_llm"] is False
     assert res["recommendation"] is not None
+
+
+@pytest.mark.asyncio
+async def test_headache_prioritizes_valid_paracetamol_in_kit_over_combo_and_ibuprofen() -> None:
+    hybrid = _load_hybrid()
+    service = DialogService(
+        history_store=InMemoryHistoryStore(),
+        event_broker=InMemoryDialogEventBroker(),
+        bm25_index=hybrid.bm25,
+        analyzer=hybrid.analyzer,
+        llm_provider=FakeLLMProvider(
+            script=[
+                [
+                    LLMTextDelta(content="Примите Парацетамол [D02]."),
+                    LLMResponse(content="Примите Парацетамол [D02]."),
+                ]
+            ]
+        ),
+    )
+    res = await service.process_query_async(
+        "У меня болит голова",
+        user_kit_names=["Парацетамол"],
+        user_kit_items=[
+            {"name": "Парацетамол", "dosage": "500 мг", "expiry": "2028-11-01", "is_expired": False}
+        ],
+    )
+    assert res["status"] == "success"
+    assert res["used_llm"] is True
+    assert res["recommendation"] is not None
+    assert "Парацетамол" in res["recommendation"]["medicine_name"]
+    assert res["recommendation"]["in_user_kit"] is True
+
+
+@pytest.mark.asyncio
+async def test_quirky_off_corpus_question_keeps_recommendation_none_with_live_llm() -> None:
+    hybrid = _load_hybrid()
+    service = DialogService(
+        history_store=InMemoryHistoryStore(),
+        event_broker=InMemoryDialogEventBroker(),
+        bm25_index=hybrid.bm25,
+        analyzer=hybrid.analyzer,
+        llm_provider=FakeLLMProvider(
+            script=[
+                [
+                    LLMTextDelta(content="**Интересный вопрос!** Уточните, что именно беспокоит."),
+                    LLMResponse(content="**Интересный вопрос!** Уточните, что именно беспокоит."),
+                ]
+            ]
+        ),
+    )
+    res = await service.process_query_async(
+        "У меня третья нога выросла",
+        user_kit_names=["Парацетамол"],
+        history=[
+            {"role": "user", "content": "У меня болит голова"},
+            {"role": "assistant", "content": "Примите Парацетамол 500 мг."},
+        ],
+    )
+    assert res["status"] == "success"
+    assert res["used_llm"] is True
+    assert res["recommendation"] is None
+    assert "**" not in res["message"]
+    assert "Интересный вопрос!" in res["message"]
+
+
+@pytest.mark.asyncio
+async def test_litellm_provider_retries_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    async def _fake_sleep(_sec: float) -> None:
+        return None
+
+    async def _fake_acompletion(**_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise litellm_sdk.RateLimitError(
+                message="Rate limit reached",
+                llm_provider="groq",
+                model="groq/openai/gpt-oss-120b",
+            )
+
+        async def _gen():
+            yield types.SimpleNamespace(
+                choices=[types.SimpleNamespace(delta=types.SimpleNamespace(content="Ок", tool_calls=None, reasoning_content=None))],
+                usage=None,
+            )
+
+        return _gen()
+
+    monkeypatch.setattr("medai.agent.providers.litellm.asyncio.sleep", _fake_sleep)
+    monkeypatch.setattr(litellm_sdk, "acompletion", _fake_acompletion)
+
+    provider = LiteLLMProvider(
+        LiteLLMProviderConfig(model="groq/openai/gpt-oss-120b", api_key="sk-test", num_retries=2)
+    )
+    events = []
+    async for ev in provider.stream((Message(role=MessageRole.USER, content="Привет"),), ()):
+        events.append(ev)
+    assert calls == 2
+    assert any(isinstance(e, LLMResponse) and e.content == "Ок" for e in events)

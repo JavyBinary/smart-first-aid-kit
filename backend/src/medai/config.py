@@ -72,7 +72,7 @@ class LiteLLMProviderConfig(BaseModel):
     api_key: str | None = None
     base_url: str | None = None
     timeout_seconds: float = Field(default=60.0, gt=0)
-    num_retries: int = Field(default=0, ge=0)
+    num_retries: int = Field(default=2, ge=0)
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     thinking: bool = False
 
