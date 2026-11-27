@@ -51,3 +51,5 @@ specs:
       status: done
     - name: 026-fullstack-sync-redis-csrf-tts-and-admin
       status: done
+    - name: 027-ux-dialog-memory-kit-priority-and-safety
+      status: done
